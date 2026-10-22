@@ -489,7 +489,7 @@ function cycle(dir: number) {
 }
 
 function syncWindowTitle() {
-  getCurrentWindow().setTitle(activePane()?.title || "Terminal");
+  getCurrentWindow().setTitle(activePane()?.title || "Ascy");
 }
 
 // ---------- Qidiruv (Ctrl+Shift+F) ----------

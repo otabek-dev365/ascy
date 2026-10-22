@@ -1,6 +1,8 @@
-# Terminal
+# Ascy
 
-Shaxsiy terminal emulyator — Tauri 2 (Rust) + xterm.js 6. Hacker-uslub: qora fon, fosfor-yashil matn, orqada Matrix yomg'iri.
+*"ASK-ee" deb o'qiladi — ASCII kabi.*
+
+Terminal emulyator — Tauri 2 (Rust) + xterm.js 6. Hacker-uslub: qora fon, fosfor-yashil matn, orqada Matrix yomg'iri.
 
 ## Imkoniyatlar
 
@@ -32,7 +34,7 @@ Shaxsiy terminal emulyator — Tauri 2 (Rust) + xterm.js 6. Hacker-uslub: qora f
 
 ## Sozlamalar
 
-`~/.config/uz.otabek.terminal/settings.json`:
+`~/.config/uz.otabek.ascy/settings.json`:
 
 ```json
 {
@@ -54,7 +56,7 @@ npm run tauri build       # release + .deb paket
 ```
 
 `.deb` natijasi: `src-tauri/target/release/bundle/deb/` — o'rnatish:
-`sudo apt install ./terminal_*.deb`, o'chirish: `sudo apt remove terminal`.
+`sudo apt install ./Ascy_*.deb`, o'chirish: `sudo apt remove ascy`.
 
 Talablar: Node.js, Rust (rustup), `libwebkit2gtk-4.1-dev`, `librsvg2-dev` (faqat paket yig'ish uchun).
 
@@ -76,8 +78,6 @@ src-tauri/icons/icon.svg# ikonka manbasi (o'lchamlar: npx tauri icon)
   (`body.matrix`) va `#shade` pardasi orqali; WebGL renderer bu rejimda
   o'chiriladi (matrix o'chiq bo'lsa avtomatik qaytadi).
 - Clipboard webview'da ishlamaydi — `tauri-plugin-clipboard-manager` ishlatiladi.
-- Menyu ikonkasi unikal nomda (`uz.otabek.terminal`), aks holda Yaru
-  mavzusidagi umumiy "terminal" ikonkasi ustun keladi.
 
 ## Litsenziya
 
