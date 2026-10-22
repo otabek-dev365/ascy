@@ -210,35 +210,30 @@ body.matrix .xterm-rows {
 /* WebKitGTK draws native GTK widgets that ignore the theme (a bright select
    box, an almost invisible checkbox), so every menu control is drawn in CSS */
 
-.segmented {
+.chips {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  overflow: hidden;
+  gap: 4px;
 }
 
-.segmented button {
+.chips button {
   background: none;
-  border: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
   color: var(--fg);
-  opacity: 0.55;
+  opacity: 0.6;
   font: 12px monospace;
-  padding: 3px 10px;
+  padding: 2px 9px;
   cursor: pointer;
 }
 
-.segmented button + button {
-  border-left: 1px solid var(--border);
-}
-
-.segmented button:hover {
+.chips button:hover {
   opacity: 1;
 }
 
-.segmented button.active {
+.chips button.active {
   background: var(--tab-active);
+  border-color: var(--accent);
   color: var(--accent);
   opacity: 1;
 }
