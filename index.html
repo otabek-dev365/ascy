@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="uz">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Terminal</title>
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+
+  <body>
+    <canvas id="matrix"></canvas>
+    <div id="shade"></div>
+    <div id="tabbar">
+      <div id="tabs"></div>
+      <button id="newtab" title="Yangi tab (Ctrl+Shift+T)">+</button>
+      <button id="menubtn" title="Menyu">☰</button>
+    </div>
+    <div id="menu" hidden>
+      <div class="menu-row">
+        <label for="m-theme">Tema</label>
+        <select id="m-theme">
+          <option value="hacker">hacker</option>
+          <option value="night">night</option>
+        </select>
+      </div>
+      <div class="menu-row">
+        <label for="m-matrix">Matrix fon</label>
+        <input id="m-matrix" type="checkbox" />
+      </div>
+      <div class="menu-group">
+        <div class="menu-label">
+          <span>Parda (matrix qoraytirishi)</span>
+          <span id="m-shade-val"></span>
+        </div>
+        <input id="m-shade" type="range" min="0" max="90" step="5" />
+      </div>
+      <div class="menu-group">
+        <div class="menu-label">
+          <span>Shrift o'lchami</span>
+          <span id="m-font-val"></span>
+        </div>
+        <input id="m-font" type="range" min="8" max="28" step="1" />
+      </div>
+      <div class="menu-actions">
+        <button id="m-settings" title="settings.json faylini ochish">Sozlamalar fayli</button>
+        <button id="m-reload" title="Fayldan qayta o'qish (Ctrl+Shift+R)">↻</button>
+      </div>
+    </div>
+    <div id="searchbar" hidden>
+      <input id="searchinput" type="text" placeholder="Qidirish…" spellcheck="false" />
+      <span id="searchcount"></span>
+      <button id="searchprev" title="Oldingisi (Shift+Enter)">▲</button>
+      <button id="searchnext" title="Keyingisi (Enter)">▼</button>
+      <button id="searchclose" title="Yopish (Esc)">×</button>
+    </div>
+    <div id="terms"></div>
+  </body>
+</html>

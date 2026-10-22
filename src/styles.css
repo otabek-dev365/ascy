@@ -1,0 +1,390 @@
+:root {
+  --bg: #000000;
+  --fg: #00ff41;
+  --border: #003b13;
+  --tab-bg: #020a02;
+  --tab-active: #04220c;
+  --accent: #00ff41;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+#matrix {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: none;
+}
+
+/* Matn o'qilishi uchun yomg'ir ustidagi yarim shaffof parda */
+#shade {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: rgba(0, 0, 0, 0.28);
+  display: none;
+}
+
+body.matrix #shade {
+  display: block;
+}
+
+/* xterm 6 theme orqali shaffof fonni qo'llamaydi — CSS bilan majburlaymiz.
+   Matrix rejimida terminalning standart foni butunlay shaffof bo'ladi,
+   qoraytirishni yuqoridagi #shade beradi. */
+body.matrix .xterm,
+body.matrix .xterm-viewport,
+body.matrix .xterm-screen,
+body.matrix .xterm-rows {
+  background: transparent !important;
+}
+
+#tabbar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: stretch;
+  height: 34px;
+  background: var(--tab-bg);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+#tabs {
+  display: flex;
+  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px 0 12px;
+  max-width: 190px;
+  font: 12px monospace;
+  color: var(--fg);
+  opacity: 0.55;
+  border-right: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.tab.active {
+  background: var(--tab-active);
+  opacity: 1;
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.tab span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab button {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+  opacity: 0.6;
+  border-radius: 3px;
+}
+
+.tab button:hover {
+  opacity: 1;
+  background: var(--border);
+}
+
+#newtab {
+  background: none;
+  border: none;
+  color: var(--fg);
+  font-size: 18px;
+  width: 36px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+#newtab:hover {
+  opacity: 1;
+  background: var(--tab-active);
+}
+
+#menubtn {
+  background: none;
+  border: none;
+  color: var(--fg);
+  font-size: 15px;
+  width: 36px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+#menubtn:hover,
+#menubtn.open {
+  opacity: 1;
+  background: var(--tab-active);
+}
+
+/* ☰ sozlamalar paneli */
+#menu {
+  position: fixed;
+  top: 38px;
+  right: 6px;
+  z-index: 4;
+  width: 240px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--tab-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  font: 12px monospace;
+  color: var(--fg);
+  user-select: none;
+}
+
+#menu[hidden] {
+  display: none;
+}
+
+.menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.menu-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.menu-label {
+  display: flex;
+  justify-content: space-between;
+  opacity: 0.85;
+}
+
+#menu label {
+  opacity: 0.85;
+}
+
+#menu input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+#menu input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+#menu select {
+  background: var(--tab-active);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: 12px monospace;
+  padding: 2px 4px;
+}
+
+.menu-actions {
+  display: flex;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.menu-actions button {
+  flex: 1;
+  background: var(--tab-active);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  border-radius: 4px;
+  padding: 4px 6px;
+  cursor: pointer;
+  font: 12px monospace;
+  opacity: 0.85;
+}
+
+.menu-actions button:hover {
+  opacity: 1;
+  border-color: var(--accent);
+}
+
+/* Qidiruv paneli (Ctrl+Shift+F) */
+#searchbar {
+  position: fixed;
+  top: 40px;
+  right: 14px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--tab-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+
+#searchbar[hidden] {
+  display: none;
+}
+
+#searchinput {
+  width: 180px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--fg);
+  font: 13px monospace;
+}
+
+#searchcount {
+  font: 11px monospace;
+  color: var(--fg);
+  opacity: 0.55;
+  min-width: 34px;
+  text-align: right;
+}
+
+#searchbar button {
+  background: none;
+  border: none;
+  color: var(--fg);
+  opacity: 0.6;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+#searchbar button:hover {
+  opacity: 1;
+  background: var(--tab-active);
+}
+
+/* Fayl sudrab kelinganda chegara ko'rsatkichi */
+body.dragover #terms {
+  outline: 2px dashed var(--accent);
+  outline-offset: -6px;
+}
+
+#terms {
+  position: relative;
+  z-index: 1;
+  height: calc(100% - 34px);
+}
+
+.term {
+  position: absolute;
+  inset: 0;
+  padding: 6px 2px 6px 6px;
+  display: none;
+}
+
+.term.active {
+  display: flex;
+}
+
+.term > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.split {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.split.row {
+  flex-direction: row;
+}
+
+.split.col {
+  flex-direction: column;
+}
+
+.split > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pane {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid transparent;
+}
+
+/* Bo'lingan tabda panellar chegara bilan ajratiladi; faolida — accent rang */
+.split .pane {
+  border-color: var(--border);
+}
+
+.split .pane.focused {
+  border-color: var(--accent);
+}
+
+.pane > .xterm {
+  height: 100%;
+}
+
+/* Panellar orasidagi tortiladigan ajratgich */
+.split > .gutter {
+  flex: 0 0 5px;
+  background: var(--border);
+  opacity: 0.6;
+  transition: background 0.15s, opacity 0.15s;
+  touch-action: none;
+}
+
+.gutter:hover,
+.gutter.dragging {
+  background: var(--accent);
+  opacity: 1;
+}
+
+.gutter.row {
+  cursor: col-resize;
+}
+
+.gutter.col {
+  cursor: row-resize;
+}
+
+.xterm-viewport::-webkit-scrollbar {
+  width: 8px;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
