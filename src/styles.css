@@ -454,6 +454,13 @@ body.dragover #terms {
   height: 100%;
 }
 
+/* xterm 6 colors its scrollable element but leaves .xterm-viewport at the
+   stylesheet's #000, which shows as a black strip under the last row in
+   non-black themes (matrix mode overrides this with transparent) */
+.pane .xterm .xterm-viewport {
+  background-color: var(--bg);
+}
+
 /* Draggable divider between panes */
 .split > .gutter {
   flex: 0 0 5px;
