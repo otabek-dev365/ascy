@@ -1,6 +1,6 @@
 [package]
 name = "ascy"
-version = "0.1.1"
+version = "0.2.0"
 description = "A hacker-style terminal emulator built with Tauri and xterm.js"
 authors = ["Otabek"]
 license = "MIT"
