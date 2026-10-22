@@ -97,6 +97,9 @@ src-tauri/icons/icon.svg  # icon source (sizes generated with `npx tauri icon`)
   and the backend stops reading from the PTY while more than 1 MiB is
   unacknowledged. A flood like `yes` slows the program down instead of
   freezing the window.
+- The release build runs under a Content Security Policy: only the app's own
+  scripts and Tauri IPC connections are allowed (inline styles too, since
+  xterm.js creates `<style>` elements at runtime).
 - The webview's clipboard API doesn't work in WebKitGTK, so
   `tauri-plugin-clipboard-manager` is used instead.
 
