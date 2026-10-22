@@ -1,0 +1,15 @@
+{
+  "api": 1,
+  "name": "Bounce",
+  "author": "Ascy",
+  "version": "1.0.0",
+  "description": "A ball bouncing around. The smallest example game: copy this folder to start your own.",
+  "controls": "←↑→↓ push the ball · Space change color · Esc back",
+  "color": "brightCyan",
+  "cover": [
+    "    ·         ",
+    "       ·      ",
+    "          ●   ",
+    "   ▀▀▀▀▀▀▀▀▀▀ "
+  ]
+}

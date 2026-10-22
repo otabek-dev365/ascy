@@ -27,6 +27,8 @@ Or build it yourself — see [Building](#building).
 
 ## Features
 
+- **Arcade** (`Ctrl+Shift+G`): ASCII games right in the terminal — Snake is
+  built in, and anyone can [make a game](docs/games.md) for it
 - Tabs and split panes (nested, resizable with the mouse); double-click a tab
   to rename it, drag it to reorder
 - Zoom a pane to fill the whole tab and back (`Ctrl+Shift+Z`)
@@ -42,6 +44,19 @@ Or build it yourself — see [Building](#building).
 - ☰ menu: theme, matrix toggle, shade and font size sliders
 
 ![The night theme with the ☰ menu open](docs/night.png)
+
+## Arcade
+
+`Ctrl+Shift+G` opens the arcade in its own tab: a list of games drawn in text,
+played right there. Games are made for Ascy — one JavaScript file and a
+`game.json` — and run in a sandbox with no access to your files, the network
+or the terminal, so a game someone sent you is safe to play. To install one,
+drag its folder onto the arcade window.
+
+![The arcade](docs/arcade.png)
+
+Want to make one? See **[Making games for Ascy](docs/games.md)** — the API
+fits on one page, and an AI can write a game with you.
 
 ## Keyboard shortcuts
 
@@ -63,6 +78,7 @@ Or build it yourself — see [Building](#building).
 | `Ctrl+Shift+P` | Next theme | `next-theme` |
 | `Ctrl+,` | Open the settings file in your default text editor | `open-settings` |
 | `Ctrl+Shift+R` | Reload settings | `reload-settings` |
+| `Ctrl+Shift+G` | Open the arcade / go back | `arcade` |
 
 Bindings follow the physical key, so they work the same with any keyboard
 layout. To change them, add `keybindings` to the settings file — your
@@ -166,10 +182,13 @@ src/                      # frontend (TypeScript)
   theme.ts                #   themes (hacker, night)
   matrix.ts               #   Matrix rain (canvas)
   settings.ts             #   loading/saving settings
-src-tauri/src/lib.rs      # backend (Rust): PTY sessions, settings commands
+  keys.ts                 #   key bindings
+  arcade/                 #   the arcade: game runtime, renderer, game list, Snake
+src-tauri/src/lib.rs      # backend (Rust): PTY sessions, settings, game files
 src-tauri/icons/icon.svg  # icon source (sizes generated with `npx tauri icon`)
+examples/games/           # example games (copy one to start your own)
 .github/workflows/        # CI checks and tagged releases
-docs/                     # README images
+docs/                     # the game guide and README images
 ```
 
 ## Technical notes
