@@ -1,12 +1,29 @@
 # Ascy
 
+[![CI](https://github.com/otabek-dev365/ascy/actions/workflows/ci.yml/badge.svg)](https://github.com/otabek-dev365/ascy/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 *Pronounced "ASK-ee", like ASCII.*
 
 A hacker-style terminal emulator built with Tauri 2 (Rust) and xterm.js 6:
 black background, phosphor-green text and an optional Matrix rain behind it.
 
+![Ascy: split panes over the Matrix rain](docs/preview.webp)
+
 > **Platform:** Linux only for now (the working directory of a shell is read
-> from `/proc`, and only a `.deb` package is built).
+> from `/proc`).
+
+## Install
+
+Download the latest `.deb` or `.AppImage` from
+[Releases](https://github.com/otabek-dev365/ascy/releases):
+
+```bash
+sudo apt install ./Ascy_*_amd64.deb                # Debian, Ubuntu and derivatives
+chmod +x Ascy_*.AppImage && ./Ascy_*.AppImage      # any distro
+```
+
+Or build it yourself — see [Building](#building).
 
 ## Features
 
@@ -18,6 +35,8 @@ black background, phosphor-green text and an optional Matrix rain behind it.
 - Drag & drop a file to type its path into the shell
 - JSON settings file, applied live without a restart
 - ☰ menu: theme, matrix toggle, shade and font size sliders
+
+![The night theme with the ☰ menu open](docs/night.png)
 
 ## Keyboard shortcuts
 
@@ -75,6 +94,12 @@ npm run tauri build       # release build + .deb package
 The package lands in `src-tauri/target/release/bundle/deb/`.
 Install with `sudo apt install ./Ascy_*.deb`, remove with `sudo apt remove ascy`.
 
+### Releasing
+
+Bump the version in `package.json` and `src-tauri/Cargo.toml`, then push a
+tag like `v0.1.2`. GitHub Actions builds the `.deb` and `.AppImage` and
+attaches them to a draft release — review it on GitHub and publish.
+
 ## Project layout
 
 ```
@@ -85,6 +110,8 @@ src/                      # frontend (TypeScript)
   settings.ts             #   loading/saving settings
 src-tauri/src/lib.rs      # backend (Rust): PTY sessions, settings commands
 src-tauri/icons/icon.svg  # icon source (sizes generated with `npx tauri icon`)
+.github/workflows/        # CI checks and tagged releases
+docs/                     # README images
 ```
 
 ## Technical notes
