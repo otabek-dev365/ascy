@@ -29,6 +29,9 @@ Or build it yourself — see [Building](#building).
 
 - Tabs and split panes (nested, resizable with the mouse); double-click a tab
   to rename it, drag it to reorder
+- Zoom a pane to fill the whole tab and back (`Ctrl+Shift+Z`)
+- Right-click menu: copy, paste, select all, split, zoom, close
+- Tabs and their directories are reopened on the next start
 - Two themes: `hacker` and `night` (Tokyo Night style)
 - Matrix rain background with an adjustable shade
 - New tabs and panes open in the active shell's directory
@@ -50,8 +53,10 @@ Or build it yourself — see [Building](#building).
 | `Alt+1..9` | Jump to tab N | `go-to-tab-1` … `go-to-tab-9` |
 | — (double-click the tab) | Rename tab | `rename-tab` |
 | `Ctrl+Shift+E` / `O` | Split side by side / stacked | `split-right` / `split-down` |
+| `Ctrl+Shift+Z` | Zoom the pane to the whole tab / back | `toggle-zoom` |
 | `Alt+←→↑↓` | Move between panes | `focus-left` / `-right` / `-up` / `-down` |
 | `Ctrl+Shift+C` / `V` | Copy / paste | `copy` / `paste` |
+| `Ctrl+Shift+A` | Select all | `select-all` |
 | `Ctrl+Shift+F` | Search (Enter — next, Shift+Enter — previous, Esc — close) | `search` |
 | `Ctrl` + `=` / `-` / `0` | Font bigger / smaller / reset | `zoom-in` / `zoom-out` / `zoom-reset` |
 | `Ctrl+Shift+M` | Toggle matrix rain | `toggle-matrix` |
@@ -90,6 +95,7 @@ key: a letter, a digit, `f1`…`f12`, `left`/`right`/`up`/`down`,
   "shade": 0.28,
   "scrollback": 10000,
   "confirmClose": true,
+  "restoreSession": true,
   "keybindings": {},
   "themes": {}
 }
@@ -104,6 +110,7 @@ key: a letter, a digit, `f1`…`f12`, `left`/`right`/`up`/`down`,
 | `shade` | How much the rain is dimmed: `0` (none) … `0.9` (almost black) |
 | `scrollback` | Number of history lines kept per pane |
 | `confirmClose` | Ask before closing a pane, tab or window where a program (vim, ssh, …) is still running |
+| `restoreSession` | Reopen the last run's tabs (directory and name) on start; they're kept in `~/.local/share/uz.otabek.ascy/session.json` |
 | `keybindings` | Your key bindings, see [Keyboard shortcuts](#keyboard-shortcuts) |
 | `themes` | Your own themes, see below |
 

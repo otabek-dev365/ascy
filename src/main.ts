@@ -13,7 +13,7 @@ import { Unicode11Addon } from "@xterm/addon-unicode11";
 import "@xterm/xterm/css/xterm.css";
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from "./settings";
 import { resolveThemes, themeByName, type AppTheme, type ThemeRegistry } from "./theme";
-import { buildKeymap, matchKey, type Action } from "./keys";
+import { buildKeymap, matchKey, shortcutLabel, type Action } from "./keys";
 import { MatrixRain } from "./matrix";
 
 interface Pane {
@@ -36,6 +36,8 @@ interface Tab {
   activePaneId: string | null;
   /** Set by renaming the tab; otherwise the tab shows its active pane's title */
   customTitle: string | null;
+  /** The pane shown alone over the whole tab (Ctrl+Shift+Z) */
+  zoomedPaneId: string | null;
 }
 
 const tabs = new Map<string, Tab>();
@@ -122,6 +124,9 @@ function runShortcut(action: Action) {
     case "split-down":
       split("col");
       break;
+    case "toggle-zoom":
+      toggleZoom();
+      break;
     case "next-tab":
       cycle(1);
       break;
@@ -153,6 +158,9 @@ function runShortcut(action: Action) {
       }
       break;
     }
+    case "select-all":
+      activePane()?.term.selectAll();
+      break;
     case "zoom-in":
       zoom(1);
       break;
@@ -306,8 +314,9 @@ async function cwdOfActivePane(): Promise<string | null> {
   return invoke<string | null>("pty_cwd", { id: pane.id }).catch(() => null);
 }
 
-async function newTab() {
-  const cwd = await cwdOfActivePane();
+/** Opens a tab in `cwd`, or by default where the active pane's shell is */
+async function newTab(cwd?: string | null): Promise<string> {
+  if (cwd === undefined) cwd = await cwdOfActivePane();
   const tabId = newId();
 
   const rootEl = document.createElement("div");
@@ -332,12 +341,21 @@ async function newTab() {
   makeTabDraggable(btn);
   tabsEl().appendChild(btn);
 
-  tabs.set(tabId, { id: tabId, rootEl, btn, titleEl, activePaneId: null, customTitle: null });
+  tabs.set(tabId, {
+    id: tabId,
+    rootEl,
+    btn,
+    titleEl,
+    activePaneId: null,
+    customTitle: null,
+    zoomedPaneId: null,
+  });
   activateTab(tabId);
 
   const el = makePaneEl(newId());
   rootEl.appendChild(el);
   await bootPane(tabId, el, cwd);
+  return tabId;
 }
 
 /** Mouse-draggable divider between two panes */
@@ -373,6 +391,7 @@ function makeGutter(dir: "row" | "col", wrap: HTMLElement): HTMLElement {
 async function split(dir: "row" | "col") {
   const pane = activePane();
   if (!pane) return;
+  unzoom(tabs.get(pane.tabId)!);
   const cwd = await cwdOfActivePane();
 
   const parent = pane.el.parentElement!;
@@ -394,6 +413,8 @@ function closePane(paneId: string, fromExit = false) {
   const pane = panes.get(paneId);
   if (!pane) return;
   if (searchPaneId === paneId) closeSearch(false);
+  const ownTab = tabs.get(pane.tabId);
+  if (ownTab) unzoom(ownTab);
   panes.delete(paneId);
   pane.unlisteners.forEach((u) => u());
   if (!fromExit) invoke("pty_kill", { id: paneId });
@@ -500,6 +521,8 @@ function setActivePane(paneId: string) {
 function navigate(dir: "focus-left" | "focus-right" | "focus-up" | "focus-down") {
   const cur = activePane();
   if (!cur || !activeTabId) return;
+  // Moving to another pane ends the zoom (and needs the real pane positions)
+  unzoom(tabs.get(activeTabId)!);
   const r = cur.el.getBoundingClientRect();
   const cx = r.x + r.width / 2;
   const cy = r.y + r.height / 2;
@@ -526,6 +549,29 @@ function navigate(dir: "focus-left" | "focus-right" | "focus-up" | "focus-down")
     setActivePane(best.id);
     best.term.focus();
   }
+}
+
+/** Shows the active pane alone over the whole tab, or back to the split */
+function toggleZoom() {
+  const tab = activeTab();
+  const pane = activePane();
+  if (!tab || !pane) return;
+  if (tab.zoomedPaneId) {
+    unzoom(tab);
+  } else if (panesOfTab(tab.id).length > 1) {
+    tab.zoomedPaneId = pane.id;
+    pane.el.classList.add("zoomed");
+    tab.rootEl.classList.add("zoomed");
+    tab.btn.classList.add("zoomed");
+  }
+}
+
+function unzoom(tab: Tab) {
+  if (!tab.zoomedPaneId) return;
+  panes.get(tab.zoomedPaneId)?.el.classList.remove("zoomed");
+  tab.zoomedPaneId = null;
+  tab.rootEl.classList.remove("zoomed");
+  tab.btn.classList.remove("zoomed");
 }
 
 function cycle(dir: number) {
@@ -848,6 +894,134 @@ async function reloadSettings() {
   applySettingsToTerms();
 }
 
+// ---------- Context menu (right click) ----------
+
+function openContextMenu(e: MouseEvent, pane: Pane) {
+  const tab = tabs.get(pane.tabId)!;
+  const isSplit = panesOfTab(tab.id).length > 1;
+  const items: ({ label: string; action: Action; enabled?: boolean } | "-")[] = [
+    { label: "Copy", action: "copy", enabled: pane.term.hasSelection() },
+    { label: "Paste", action: "paste" },
+    { label: "Select all", action: "select-all" },
+    "-",
+    { label: "Split right", action: "split-right" },
+    { label: "Split down", action: "split-down" },
+    { label: tab.zoomedPaneId ? "Unzoom pane" : "Zoom pane", action: "toggle-zoom", enabled: isSplit },
+    "-",
+    { label: "Close pane", action: "close-pane" },
+  ];
+  const el = document.getElementById("ctxmenu")!;
+  el.replaceChildren(
+    ...items.map((item) => {
+      if (item === "-") {
+        const sep = document.createElement("div");
+        sep.className = "ctx-sep";
+        return sep;
+      }
+      const b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("role", "menuitem");
+      b.disabled = item.enabled === false;
+      const label = document.createElement("span");
+      label.textContent = item.label;
+      const key = document.createElement("span");
+      key.className = "ctx-key";
+      key.textContent = shortcutLabel(keymap, item.action) ?? "";
+      b.append(label, key);
+      b.addEventListener("click", () => {
+        closeContextMenu();
+        runShortcut(item.action);
+      });
+      return b;
+    }),
+  );
+  el.hidden = false;
+  // Open at the pointer, but keep the whole menu inside the window
+  const { width, height } = el.getBoundingClientRect();
+  el.style.left = `${Math.max(4, Math.min(e.clientX, window.innerWidth - width - 4))}px`;
+  el.style.top = `${Math.max(4, Math.min(e.clientY, window.innerHeight - height - 4))}px`;
+}
+
+function closeContextMenu() {
+  const el = document.getElementById("ctxmenu")!;
+  if (el.hidden) return;
+  el.hidden = true;
+  activePane()?.term.focus();
+}
+
+function initContextMenu() {
+  termsEl().addEventListener("contextmenu", (e) => {
+    const paneEl = (e.target as HTMLElement).closest<HTMLElement>(".pane");
+    const pane = paneEl ? panes.get(paneEl.dataset.paneId ?? "") : undefined;
+    if (!pane) return;
+    e.preventDefault();
+    // Apps with mouse support (vim, htop, …) get the right click;
+    // Shift+right click still opens the menu
+    if (pane.term.modes.mouseTrackingMode !== "none" && !e.shiftKey) return;
+    setActivePane(pane.id);
+    openContextMenu(e, pane);
+  });
+  const menu = document.getElementById("ctxmenu")!;
+  document.addEventListener("pointerdown", (e) => {
+    if (!menu.contains(e.target as Node)) closeContextMenu();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.code === "Escape") closeContextMenu();
+  });
+  window.addEventListener("blur", closeContextMenu);
+  window.addEventListener("resize", closeContextMenu);
+}
+
+// ---------- Session (tabs reopened on the next start) ----------
+
+interface SavedSession {
+  tabs: { cwd: string | null; title: string | null }[];
+  active: number;
+}
+
+let lastSavedSession = "";
+
+/** Writes the open tabs (directory, custom name) to session.json if they changed */
+async function saveSession() {
+  if (!settings.restoreSession) return;
+  const order = tabOrder();
+  const session: SavedSession = {
+    tabs: await Promise.all(
+      order.map(async (id) => {
+        const tab = tabs.get(id)!;
+        const cwd = tab.activePaneId
+          ? await invoke<string | null>("pty_cwd", { id: tab.activePaneId }).catch(() => null)
+          : null;
+        return { cwd, title: tab.customTitle };
+      }),
+    ),
+    active: Math.max(0, order.indexOf(activeTabId ?? "")),
+  };
+  const text = JSON.stringify(session);
+  if (text === lastSavedSession) return;
+  lastSavedSession = text;
+  await invoke("session_save", { session }).catch(() => {});
+}
+
+/** Reopens the tabs of the last run; false if there was nothing to restore */
+async function restoreSession(): Promise<boolean> {
+  if (!settings.restoreSession) return false;
+  const saved = await invoke<SavedSession | null>("session_load").catch(() => null);
+  const list = Array.isArray(saved?.tabs) ? saved.tabs : [];
+  if (list.length === 0) return false;
+  for (const t of list) {
+    const tab = tabs.get(await newTab(typeof t?.cwd === "string" ? t.cwd : null));
+    if (tab && typeof t?.title === "string") {
+      tab.customTitle = t.title;
+      refreshTitle(tab);
+    }
+  }
+  const order = tabOrder();
+  const active = Number(saved?.active) || 0;
+  activateTab(order[Math.min(Math.max(0, active), order.length - 1)]);
+  return true;
+}
+
 // ---------- Confirmation dialog ----------
 
 /** Themed yes/no dialog (native ones ignore the theme); resolves true on "Close" */
@@ -913,10 +1087,15 @@ async function main() {
   document.getElementById("newtab")!.addEventListener("click", () => newTab());
   initSearchBar();
   initMenu();
-  // Closing the window (title bar ×, Alt+F4) asks too if programs are running
+  initContextMenu();
+  // Closing the window (title bar ×, Alt+F4) asks too if programs are running;
+  // once it's really closing, the open tabs are saved for the next start
   await getCurrentWindow().onCloseRequested(async (event) => {
     if (!(await okToClose([...panes.keys()], "Ascy"))) event.preventDefault();
+    else await saveSession();
   });
+  // Also save now and then, in case the app doesn't get to close cleanly (logout)
+  setInterval(saveSession, 30_000);
 
   window.addEventListener("keydown", (e) => {
     const action = matchShortcut(e);
@@ -943,7 +1122,7 @@ async function main() {
     }
   });
 
-  await newTab();
+  if (!(await restoreSession())) await newTab();
 }
 
 window.addEventListener("DOMContentLoaded", main);

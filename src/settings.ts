@@ -12,6 +12,8 @@ export interface Settings {
   scrollback: number;
   /** Ask before closing a pane, tab or window where a program is running */
   confirmClose: boolean;
+  /** Reopen the last run's tabs (directories and names) on start */
+  restoreSession: boolean;
   /** Key combo → action, on top of the defaults; null removes a binding */
   keybindings: Record<string, string | null>;
   /** User themes: name → xterm colors (see ThemeSpec) */
@@ -27,6 +29,7 @@ export const DEFAULT_SETTINGS: Settings = {
   shade: 0.28,
   scrollback: 10000,
   confirmClose: true,
+  restoreSession: true,
   keybindings: {},
   themes: {},
 };

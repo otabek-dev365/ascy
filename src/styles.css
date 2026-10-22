@@ -373,6 +373,59 @@ body.matrix .xterm-rows {
   background: var(--tab-active);
 }
 
+/* Right-click menu */
+#ctxmenu {
+  position: fixed;
+  z-index: 5;
+  min-width: 210px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  background: var(--tab-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  font: 12px monospace;
+  user-select: none;
+}
+
+#ctxmenu[hidden] {
+  display: none;
+}
+
+#ctxmenu button {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 5px 8px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+#ctxmenu button:hover:not(:disabled) {
+  background: var(--tab-active);
+}
+
+#ctxmenu button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.ctx-key {
+  opacity: 0.5;
+}
+
+.ctx-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+
 /* Short notifications: settings reloaded, settings.json errors */
 #toast {
   position: fixed;
@@ -538,6 +591,24 @@ body.dragover #terms {
    non-black themes (matrix mode overrides this with transparent) */
 .pane .xterm .xterm-viewport {
   background-color: var(--bg);
+}
+
+/* Zoomed pane (Ctrl+Shift+Z) fills the tab; the rest of the split keeps its
+   layout but is hidden, so nothing has to resize when the zoom ends */
+.term.zoomed .pane:not(.zoomed),
+.term.zoomed .gutter {
+  visibility: hidden;
+}
+
+.term.zoomed .pane.zoomed {
+  position: absolute;
+  inset: 6px 2px 6px 6px; /* .term's padding */
+  z-index: 1;
+}
+
+.tab.zoomed span::before {
+  content: "⤢ ";
+  color: var(--accent);
 }
 
 /* Draggable divider between panes */

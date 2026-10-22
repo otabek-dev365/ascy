@@ -280,6 +280,34 @@ fn settings_file(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     Ok(dir.join("settings.json"))
 }
 
+fn session_file(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    Ok(dir.join("session.json"))
+}
+
+/// The tabs of the last run, reopened on start
+#[tauri::command]
+fn session_load(app: AppHandle) -> Result<Option<serde_json::Value>, String> {
+    let Ok(text) = std::fs::read_to_string(session_file(&app)?) else {
+        return Ok(None);
+    };
+    // A damaged session file just means starting fresh
+    Ok(serde_json::from_str(&text).ok())
+}
+
+#[tauri::command]
+fn session_save(app: AppHandle, session: serde_json::Value) -> Result<(), String> {
+    let path = session_file(&app)?;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    let text = serde_json::to_string_pretty(&session).map_err(|e| e.to_string())?;
+    // Write a temp file and rename it, so a crash mid-write can't leave half a file
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, text).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn settings_load(app: AppHandle) -> Result<Option<serde_json::Value>, String> {
     let path = settings_file(&app)?;
@@ -345,6 +373,8 @@ pub fn run() {
             pty_cwd,
             pty_foreground,
             settings_load,
+            session_load,
+            session_save,
             settings_save,
             settings_open
         ])

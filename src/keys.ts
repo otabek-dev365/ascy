@@ -7,12 +7,14 @@ const BASE_ACTIONS = [
   "rename-tab",
   "split-right",
   "split-down",
+  "toggle-zoom",
   "focus-left",
   "focus-right",
   "focus-up",
   "focus-down",
   "copy",
   "paste",
+  "select-all",
   "search",
   "zoom-in",
   "zoom-out",
@@ -38,12 +40,14 @@ export const DEFAULT_KEYBINDINGS: Record<string, Action> = {
   "ctrl+pageup": "prev-tab",
   "ctrl+shift+e": "split-right",
   "ctrl+shift+o": "split-down",
+  "ctrl+shift+z": "toggle-zoom",
   "alt+left": "focus-left",
   "alt+right": "focus-right",
   "alt+up": "focus-up",
   "alt+down": "focus-down",
   "ctrl+shift+c": "copy",
   "ctrl+shift+v": "paste",
+  "ctrl+shift+a": "select-all",
   "ctrl+shift+f": "search",
   "ctrl+equal": "zoom-in",
   "ctrl+shift+equal": "zoom-in",
@@ -132,6 +136,19 @@ export function buildKeymap(user: unknown): Keymap {
     }
   }
   return { bindings, errors };
+}
+
+/** The first key bound to an action, for menus: "ctrl+shift+c" → "Ctrl+Shift+C" */
+export function shortcutLabel(bindings: Map<string, Action>, action: Action): string | null {
+  for (const [combo, bound] of bindings) {
+    if (bound === action) {
+      return combo
+        .split("+")
+        .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+        .join("+");
+    }
+  }
+  return null;
 }
 
 /** The action bound to this key press, if any */
