@@ -5,6 +5,7 @@ description = "A hacker-style terminal emulator built with Tauri and xterm.js"
 authors = ["Otabek"]
 license = "MIT"
 repository = "https://github.com/otabek-dev365/ascy"
+homepage = "https://github.com/otabek-dev365/ascy"
 edition = "2021"
 
 [lib]
