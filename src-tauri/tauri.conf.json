@@ -24,7 +24,8 @@
       "csp": {
         "default-src": "'self'",
         "connect-src": "ipc: http://ipc.localhost",
-        "style-src": "'self' 'unsafe-inline'"
+        "style-src": "'self' 'unsafe-inline'",
+        "worker-src": "blob:"
       }
     }
   },

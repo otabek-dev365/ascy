@@ -611,6 +611,11 @@ body.dragover #terms {
   color: var(--accent);
 }
 
+/* Arcade panes: the game handles the mouse, so xterm must not select text */
+.pane.arcade .xterm {
+  pointer-events: none;
+}
+
 /* Draggable divider between panes */
 .split > .gutter {
   flex: 0 0 5px;

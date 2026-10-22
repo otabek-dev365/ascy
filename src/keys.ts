@@ -23,6 +23,7 @@ const BASE_ACTIONS = [
   "next-theme",
   "open-settings",
   "reload-settings",
+  "arcade",
 ] as const;
 
 export type Action =
@@ -59,6 +60,7 @@ export const DEFAULT_KEYBINDINGS: Record<string, Action> = {
   "ctrl+shift+p": "next-theme",
   "ctrl+comma": "open-settings",
   "ctrl+shift+r": "reload-settings",
+  "ctrl+shift+g": "arcade",
   ...Object.fromEntries(
     [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [`alt+${n}`, `go-to-tab-${n}` as Action]),
   ),

@@ -15,6 +15,7 @@ import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from "./s
 import { resolveThemes, themeByName, type AppTheme, type ThemeRegistry } from "./theme";
 import { buildKeymap, matchKey, shortcutLabel, type Action } from "./keys";
 import { MatrixRain } from "./matrix";
+import { Arcade } from "./arcade/arcade";
 
 interface Pane {
   id: string;
@@ -26,6 +27,9 @@ interface Pane {
   webgl: WebglAddon | null;
   title: string;
   unlisteners: UnlistenFn[];
+  /** A shell, or the arcade: the game list and the games (Ctrl+Shift+G) */
+  kind: "shell" | "arcade";
+  arcade: Arcade | null;
 }
 
 interface Tab {
@@ -136,6 +140,9 @@ function runShortcut(action: Action) {
     case "rename-tab":
       if (activeTabId) renameTab(activeTabId);
       break;
+    case "arcade":
+      toggleArcade();
+      break;
     case "focus-left":
     case "focus-right":
     case "focus-up":
@@ -217,14 +224,13 @@ function openLink(e: MouseEvent, uri: string) {
 }
 
 /** Opens a terminal inside an already placed .pane element and starts the shell */
-async function bootPane(tabId: string, el: HTMLElement, cwd: string | null) {
-  const id = el.dataset.paneId!;
-
+/** The terminal and add-ons of a pane, opened in its element */
+function makeTerminal(el: HTMLElement, kind: Pane["kind"]) {
   const term = new Terminal({
     fontFamily: settings.fontFamily,
     fontSize: settings.fontSize,
-    cursorBlink: true,
-    scrollback: settings.scrollback,
+    cursorBlink: kind === "shell",
+    scrollback: kind === "shell" ? settings.scrollback : 0,
     allowTransparency: true,
     theme: currentXtermTheme(),
     // OSC 8 hyperlinks (`ls --hyperlink`, compiler output); http(s) only
@@ -236,7 +242,7 @@ async function bootPane(tabId: string, el: HTMLElement, cwd: string | null) {
   term.loadAddon(fit);
   const search = new SearchAddon();
   term.loadAddon(search);
-  term.loadAddon(new WebLinksAddon(openLink));
+  if (kind === "shell") term.loadAddon(new WebLinksAddon(openLink));
   // Unicode 11 widths — emoji and CJK take two cells, so prompts don't drift
   term.loadAddon(new Unicode11Addon());
   term.unicode.activeVersion = "11";
@@ -252,8 +258,25 @@ async function bootPane(tabId: string, el: HTMLElement, cwd: string | null) {
       webgl = null;
     }
   }
+  return { term, fit, search, webgl };
+}
 
-  const pane: Pane = { id, tabId, term, fit, search, el, webgl, title: "shell", unlisteners: [] };
+async function bootPane(tabId: string, el: HTMLElement, cwd: string | null) {
+  const id = el.dataset.paneId!;
+  const { term, fit, search, webgl } = makeTerminal(el, "shell");
+  const pane: Pane = {
+    id,
+    tabId,
+    term,
+    fit,
+    search,
+    el,
+    webgl,
+    title: "shell",
+    unlisteners: [],
+    kind: "shell",
+    arcade: null,
+  };
   panes.set(id, pane);
   paneRO.observe(el);
 
@@ -317,6 +340,15 @@ async function cwdOfActivePane(): Promise<string | null> {
 /** Opens a tab in `cwd`, or by default where the active pane's shell is */
 async function newTab(cwd?: string | null): Promise<string> {
   if (cwd === undefined) cwd = await cwdOfActivePane();
+  const tab = createTab();
+  const el = makePaneEl(newId());
+  tab.rootEl.appendChild(el);
+  await bootPane(tab.id, el, cwd);
+  return tab.id;
+}
+
+/** Adds a tab (its button and an empty content area) and switches to it */
+function createTab(): Tab {
   const tabId = newId();
 
   const rootEl = document.createElement("div");
@@ -341,7 +373,7 @@ async function newTab(cwd?: string | null): Promise<string> {
   makeTabDraggable(btn);
   tabsEl().appendChild(btn);
 
-  tabs.set(tabId, {
+  const tab: Tab = {
     id: tabId,
     rootEl,
     btn,
@@ -349,13 +381,110 @@ async function newTab(cwd?: string | null): Promise<string> {
     activePaneId: null,
     customTitle: null,
     zoomedPaneId: null,
-  });
+  };
+  tabs.set(tabId, tab);
   activateTab(tabId);
+  return tab;
+}
 
+// ---------- Arcade (Ctrl+Shift+G) ----------
+
+/** The tab the arcade was opened from: Esc / Ctrl+Shift+G go back to it */
+let tabBeforeArcade: string | null = null;
+
+function arcadeTab(): Tab | undefined {
+  const pane = [...panes.values()].find((p) => p.kind === "arcade");
+  return pane ? tabs.get(pane.tabId) : undefined;
+}
+
+/** Opens the arcade in its own tab, or goes back to where you came from */
+async function toggleArcade() {
+  const tab = arcadeTab();
+  if (tab && tab.id === activeTabId) return leaveArcade();
+  tabBeforeArcade = activeTabId;
+  if (tab) {
+    activateTab(tab.id);
+    return;
+  }
+  const newOne = createTab();
   const el = makePaneEl(newId());
-  rootEl.appendChild(el);
-  await bootPane(tabId, el, cwd);
-  return tabId;
+  newOne.rootEl.appendChild(el);
+  await bootArcadePane(newOne.id, el);
+}
+
+function leaveArcade() {
+  if (tabBeforeArcade && tabBeforeArcade !== activeTabId && tabs.has(tabBeforeArcade)) {
+    activateTab(tabBeforeArcade);
+  }
+}
+
+/** A pane that runs the game list and the games instead of a shell */
+async function bootArcadePane(tabId: string, el: HTMLElement) {
+  const id = el.dataset.paneId!;
+  el.classList.add("arcade");
+  const { term, fit, search, webgl } = makeTerminal(el, "arcade");
+  const pane: Pane = {
+    id,
+    tabId,
+    term,
+    fit,
+    search,
+    el,
+    webgl,
+    title: "Arcade",
+    unlisteners: [],
+    kind: "arcade",
+    arcade: null,
+  };
+  panes.set(id, pane);
+  paneRO.observe(el);
+  const arcade = new Arcade(term, {
+    setTitle: (title) => {
+      pane.title = title;
+      const tab = tabs.get(tabId);
+      if (tab?.activePaneId === id) refreshTitle(tab);
+    },
+    leave: leaveArcade,
+    accent: () => currentTheme().css["--accent"],
+    toast: showToast,
+  });
+  pane.arcade = arcade;
+
+  // Keys go to the game, except the app's own shortcuts
+  term.attachCustomKeyEventHandler((e) => {
+    if (matchShortcut(e)) return false;
+    arcade.key(e);
+    if (e.type === "keydown") e.preventDefault();
+    return false;
+  });
+  term.textarea?.addEventListener("blur", () => arcade.blur());
+  // The game gets the mouse (xterm itself doesn't, see .pane.arcade in the CSS)
+  for (const type of ["pointerdown", "pointerup", "pointermove"] as const) {
+    el.addEventListener(type, (e) => {
+      if (type === "pointerdown") term.focus();
+      arcade.mouse(e);
+    });
+  }
+  el.addEventListener("wheel", (e) => arcade.mouse(e), { passive: true });
+  el.addEventListener("focusin", () => setActivePane(id));
+  term.onResize(({ cols, rows }) => arcade.resize(cols, rows));
+
+  safeFit(pane);
+  setActivePane(id);
+  term.focus();
+  arcade.setVisible(activeTabId === tabId);
+  await arcade.showHub();
+}
+
+/** Copies a dropped game folder into the games folder and refreshes the list */
+async function installGame(pane: Pane, path: string) {
+  try {
+    const id = await invoke<string>("game_install", { path });
+    showToast(`Game installed: ${id}`);
+    pane.arcade?.refresh();
+  } catch (e) {
+    showToast(`Can't install the game: ${e}`, true);
+  }
 }
 
 /** Mouse-draggable divider between two panes */
@@ -417,7 +546,8 @@ function closePane(paneId: string, fromExit = false) {
   if (ownTab) unzoom(ownTab);
   panes.delete(paneId);
   pane.unlisteners.forEach((u) => u());
-  if (!fromExit) invoke("pty_kill", { id: paneId });
+  if (!fromExit && pane.kind === "shell") invoke("pty_kill", { id: paneId });
+  pane.arcade?.dispose();
   paneRO.unobserve(pane.el);
   pane.term.dispose();
 
@@ -454,8 +584,9 @@ function closeTab(tabId: string) {
 
 /** Programs (not just the shell) running in these panes */
 async function runningPrograms(paneIds: string[]): Promise<string[]> {
+  const shells = paneIds.filter((id) => panes.get(id)?.kind === "shell");
   const names = await Promise.all(
-    paneIds.map((id) => invoke<string | null>("pty_foreground", { id }).catch(() => null)),
+    shells.map((id) => invoke<string | null>("pty_foreground", { id }).catch(() => null)),
   );
   return names.filter((n): n is string => !!n);
 }
@@ -496,6 +627,7 @@ function activateTab(tabId: string) {
     t.rootEl.classList.toggle("active", tid === tabId);
     t.btn.classList.toggle("active", tid === tabId);
   }
+  for (const p of panes.values()) p.arcade?.setVisible(p.tabId === tabId);
   const tab = tabs.get(tabId)!;
   requestAnimationFrame(() => {
     for (const p of panesOfTab(tabId)) safeFit(p);
@@ -866,7 +998,7 @@ function applySettingsToTerms() {
     }
     p.term.options.fontSize = settings.fontSize;
     p.term.options.fontFamily = settings.fontFamily;
-    p.term.options.scrollback = settings.scrollback;
+    p.term.options.scrollback = p.kind === "shell" ? settings.scrollback : 0;
     p.term.options.theme = currentXtermTheme();
     safeFit(p);
   }
@@ -955,6 +1087,7 @@ function initContextMenu() {
     const pane = paneEl ? panes.get(paneEl.dataset.paneId ?? "") : undefined;
     if (!pane) return;
     e.preventDefault();
+    if (pane.kind === "arcade") return;
     // Apps with mouse support (vim, htop, …) get the right click;
     // Shift+right click still opens the menu
     if (pane.term.modes.mouseTrackingMode !== "none" && !e.shiftKey) return;
@@ -984,13 +1117,16 @@ let lastSavedSession = "";
 /** Writes the open tabs (directory, custom name) to session.json if they changed */
 async function saveSession() {
   if (!settings.restoreSession) return;
-  const order = tabOrder();
+  // Only shell tabs are reopened; the arcade is one keypress away
+  const order = tabOrder().filter((id) => panesOfTab(id).some((p) => p.kind === "shell"));
   const session: SavedSession = {
     tabs: await Promise.all(
       order.map(async (id) => {
         const tab = tabs.get(id)!;
-        const cwd = tab.activePaneId
-          ? await invoke<string | null>("pty_cwd", { id: tab.activePaneId }).catch(() => null)
+        const active = tab.activePaneId ? panes.get(tab.activePaneId) : undefined;
+        const shell = active?.kind === "shell" ? active : panesOfTab(id).find((p) => p.kind === "shell");
+        const cwd = shell
+          ? await invoke<string | null>("pty_cwd", { id: shell.id }).catch(() => null)
           : null;
         return { cwd, title: tab.customTitle };
       }),
@@ -1097,6 +1233,10 @@ async function main() {
   // Also save now and then, in case the app doesn't get to close cleanly (logout)
   setInterval(saveSession, 30_000);
 
+  window.addEventListener("blur", () => {
+    for (const p of panes.values()) p.arcade?.blur();
+  });
+
   window.addEventListener("keydown", (e) => {
     const action = matchShortcut(e);
     if (action) {
@@ -1115,7 +1255,9 @@ async function main() {
     document.body.classList.toggle("dragover", p.type === "enter");
     if (p.type === "drop" && p.paths.length) {
       const pane = activePane();
-      if (pane) {
+      if (pane?.kind === "arcade") {
+        for (const path of p.paths) installGame(pane, path);
+      } else if (pane) {
         pane.term.paste(p.paths.map(quotePath).join(" ") + " ");
         pane.term.focus();
       }

@@ -1,0 +1,16 @@
+{
+  "api": 1,
+  "name": "Snake",
+  "author": "Ascy",
+  "version": "1.0.0",
+  "description": "Eat, grow longer, and don't hit the walls or your own tail.",
+  "controls": "←↑→↓ / WASD move · P pause · Esc menu",
+  "color": "green",
+  "score": "higher",
+  "cover": [
+    "████████████  ▐▌",
+    "██              ",
+    "██████████████  ",
+    "            ██  "
+  ]
+}
