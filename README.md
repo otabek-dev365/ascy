@@ -32,6 +32,7 @@ Or build it yourself — see [Building](#building).
 - Matrix rain background with an adjustable shade
 - New tabs and panes open in the active shell's directory
 - Scrollback search; URLs open with Ctrl+click
+- Asks before closing a tab where a program (vim, ssh, …) is still running
 - Drag & drop a file to type its path into the shell
 - JSON settings file, applied live without a restart
 - ☰ menu: theme, matrix toggle, shade and font size sliders
@@ -86,6 +87,7 @@ key: a letter, a digit, `f1`…`f12`, `left`/`right`/`up`/`down`,
   "matrix": true,
   "shade": 0.28,
   "scrollback": 10000,
+  "confirmClose": true,
   "keybindings": {},
   "themes": {}
 }
@@ -99,6 +101,7 @@ key: a letter, a digit, `f1`…`f12`, `left`/`right`/`up`/`down`,
 | `matrix` | Matrix rain background on/off |
 | `shade` | How much the rain is dimmed: `0` (none) … `0.9` (almost black) |
 | `scrollback` | Number of history lines kept per pane |
+| `confirmClose` | Ask before closing a pane, tab or window where a program (vim, ssh, …) is still running |
 | `keybindings` | Your key bindings, see [Keyboard shortcuts](#keyboard-shortcuts) |
 | `themes` | Your own themes, see below |
 

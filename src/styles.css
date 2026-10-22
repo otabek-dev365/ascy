@@ -386,6 +386,70 @@ body.matrix .xterm-rows {
   border-color: #f7768e;
 }
 
+/* Confirmation dialog (closing a pane with a running program) */
+#dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+#dialog[hidden] {
+  display: none;
+}
+
+.dialog-box {
+  width: min(380px, calc(100% - 32px));
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--tab-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+  font: 13px monospace;
+}
+
+#dialog-title {
+  font-weight: bold;
+}
+
+#dialog-text {
+  opacity: 0.8;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.dialog-actions button {
+  background: var(--tab-active);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 12px;
+  font: 12px monospace;
+  cursor: pointer;
+}
+
+.dialog-actions button:focus-visible,
+.dialog-actions button:hover {
+  border-color: var(--accent);
+  outline: none;
+}
+
+#dialog-ok {
+  color: #f7768e;
+}
+
 /* Outline shown while a file is dragged over the window */
 body.dragover #terms {
   outline: 2px dashed var(--accent);

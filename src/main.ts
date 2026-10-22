@@ -108,7 +108,10 @@ function runShortcut(action: Action) {
       break;
     case "close-pane": {
       const pane = activePane();
-      if (pane) closePane(pane.id);
+      if (pane) {
+        const alone = panesOfTab(pane.tabId).length === 1;
+        closeWithConfirm([pane.id], alone ? "this tab" : "this pane");
+      }
       break;
     }
     case "split-right":
@@ -420,8 +423,31 @@ function closePane(paneId: string, fromExit = false) {
 }
 
 function closeTab(tabId: string) {
-  // Close every pane — the last one takes the tab with it
-  for (const pane of panesOfTab(tabId)) closePane(pane.id);
+  closeWithConfirm(panesOfTab(tabId).map((p) => p.id), "this tab");
+}
+
+/** Programs (not just the shell) running in these panes */
+async function runningPrograms(paneIds: string[]): Promise<string[]> {
+  const names = await Promise.all(
+    paneIds.map((id) => invoke<string | null>("pty_foreground", { id }).catch(() => null)),
+  );
+  return names.filter((n): n is string => !!n);
+}
+
+/** Asks before closing if a program would be killed; true if it's fine to close */
+async function okToClose(paneIds: string[], what: string): Promise<boolean> {
+  if (!settings.confirmClose) return true;
+  const running = await runningPrograms(paneIds);
+  if (running.length === 0) return true;
+  const list = [...new Set(running)].join(", ");
+  const verb = running.length > 1 ? "are" : "is";
+  return confirmDialog(`Close ${what}?`, `${list} ${verb} still running and will be stopped.`);
+}
+
+async function closeWithConfirm(paneIds: string[], what: string) {
+  if (!(await okToClose(paneIds, what))) return;
+  // Closing every pane of a tab takes the tab with it
+  for (const id of paneIds) closePane(id);
 }
 
 function removeTab(tab: Tab) {
@@ -740,6 +766,39 @@ async function reloadSettings() {
   applySettingsToTerms();
 }
 
+// ---------- Confirmation dialog ----------
+
+/** Themed yes/no dialog (native ones ignore the theme); resolves true on "Close" */
+function confirmDialog(title: string, text: string): Promise<boolean> {
+  const el = document.getElementById("dialog")!;
+  const ok = document.getElementById("dialog-ok") as HTMLButtonElement;
+  const cancel = document.getElementById("dialog-cancel") as HTMLButtonElement;
+  document.getElementById("dialog-title")!.textContent = title;
+  document.getElementById("dialog-text")!.textContent = text;
+  el.hidden = false;
+  ok.focus();
+  return new Promise((resolve) => {
+    const done = (answer: boolean) => {
+      el.hidden = true;
+      el.removeEventListener("keydown", onKey);
+      el.removeEventListener("click", onClick);
+      activePane()?.term.focus();
+      resolve(answer);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      // Keep keys away from the terminal and the global shortcuts
+      e.stopPropagation();
+      if (e.code === "Escape") done(false);
+    };
+    const onClick = (e: MouseEvent) => {
+      if (e.target === ok) done(true);
+      else if (e.target === cancel || e.target === el) done(false);
+    };
+    el.addEventListener("keydown", onKey);
+    el.addEventListener("click", onClick);
+  });
+}
+
 // ---------- Notifications ----------
 
 let toastTimer = 0;
@@ -772,6 +831,11 @@ async function main() {
   document.getElementById("newtab")!.addEventListener("click", () => newTab());
   initSearchBar();
   initMenu();
+  // Closing the window (title bar ×, Alt+F4) asks too if programs are running
+  await getCurrentWindow().onCloseRequested(async (event) => {
+    if (!(await okToClose([...panes.keys()], "Ascy"))) event.preventDefault();
+  });
+
   window.addEventListener("keydown", (e) => {
     const action = matchShortcut(e);
     if (action) {

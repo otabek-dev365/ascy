@@ -10,6 +10,8 @@ export interface Settings {
   /** How much the matrix rain is dimmed: 0 (no shade) .. 0.9 (almost black) */
   shade: number;
   scrollback: number;
+  /** Ask before closing a pane, tab or window where a program is running */
+  confirmClose: boolean;
   /** Key combo → action, on top of the defaults; null removes a binding */
   keybindings: Record<string, string | null>;
   /** User themes: name → xterm colors (see ThemeSpec) */
@@ -24,6 +26,7 @@ export const DEFAULT_SETTINGS: Settings = {
   matrix: true,
   shade: 0.28,
   scrollback: 10000,
+  confirmClose: true,
   keybindings: {},
   themes: {},
 };

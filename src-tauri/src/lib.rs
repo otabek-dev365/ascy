@@ -233,6 +233,22 @@ fn pty_kill(state: State<PtyState>, id: String) -> Result<(), String> {
     Ok(())
 }
 
+/// The program in the foreground of the pane, unless it's the shell itself:
+/// closing the pane would kill it (vim, ssh, a running build, …)
+#[tauri::command]
+fn pty_foreground(state: State<PtyState>, id: String) -> Result<Option<String>, String> {
+    let session = get_session(&state, &id)?;
+    let group = session.master.lock().unwrap().process_group_leader();
+    Ok(match (group, session.pid) {
+        (Some(group), Some(shell)) if group as u32 != shell => {
+            std::fs::read_to_string(format!("/proc/{group}/comm"))
+                .ok()
+                .map(|name| name.trim().to_owned())
+        }
+        _ => None,
+    })
+}
+
 /// The shell's current directory — so a new tab/pane opens in the same place
 #[tauri::command]
 fn pty_cwd(state: State<PtyState>, id: String) -> Result<Option<String>, String> {
@@ -320,6 +336,7 @@ pub fn run() {
             pty_kill,
             pty_kill_all,
             pty_cwd,
+            pty_foreground,
             settings_load,
             settings_save,
             settings_open
