@@ -283,6 +283,32 @@ body.matrix .xterm-rows {
   background: var(--tab-active);
 }
 
+/* Short notifications: settings reloaded, settings.json errors */
+#toast {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 5;
+  max-width: min(480px, calc(100% - 28px));
+  padding: 8px 12px;
+  background: var(--tab-bg);
+  color: var(--fg);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  font: 12px monospace;
+  white-space: pre-wrap;
+  cursor: pointer;
+}
+
+#toast[hidden] {
+  display: none;
+}
+
+#toast.error {
+  border-color: #f7768e;
+}
+
 /* Outline shown while a file is dragged over the window */
 body.dragover #terms {
   outline: 2px dashed var(--accent);

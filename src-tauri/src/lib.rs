@@ -1,14 +1,47 @@
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::sync::{Arc, Mutex};
+use std::os::fd::RawFd;
+use std::sync::mpsc::Sender;
+use std::sync::{Arc, Condvar, Mutex};
+use tauri::ipc::{Channel, InvokeResponseBody};
 use tauri::{AppHandle, Emitter, Manager, State};
+
+// Output flow control: the reader stops reading from the PTY while too much
+// output is still waiting for xterm.js, so a flood (`yes`, a huge `cat`)
+// blocks the program instead of piling up in the webview's memory.
+/// Pause reading once this many bytes are unacknowledged...
+const FLOW_HIGH: usize = 1 << 20;
+/// ...and resume when the frontend has caught up to this
+const FLOW_LOW: usize = 256 << 10;
+/// Largest output chunk sent to the frontend in one message
+const CHUNK: usize = 64 << 10;
+
+#[derive(Default)]
+struct Flow {
+    /// Bytes sent to the frontend but not yet processed by xterm.js
+    unacked: usize,
+    /// Set when the session is killed, so a paused reader can finish
+    closed: bool,
+}
 
 struct PtySession {
     master: Mutex<Box<dyn MasterPty + Send>>,
-    writer: Mutex<Box<dyn Write + Send>>,
+    /// Input goes through a writer thread: a blocking write (e.g. a big paste
+    /// into a program that isn't reading) must never stall the main thread
+    input: Sender<Vec<u8>>,
     child: Mutex<Box<dyn Child + Send + Sync>>,
     pid: Option<u32>,
+    flow: Mutex<Flow>,
+    flow_cv: Condvar,
+}
+
+impl PtySession {
+    fn kill(&self) {
+        self.flow.lock().unwrap().closed = true;
+        self.flow_cv.notify_one();
+        let _ = self.child.lock().unwrap().kill();
+    }
 }
 
 #[derive(Default)]
@@ -23,6 +56,17 @@ fn size(cols: u16, rows: u16) -> PtySize {
     }
 }
 
+/// True if the PTY has more output ready right now (poll with zero timeout)
+fn has_more_output(fd: RawFd) -> bool {
+    let mut pfd = libc::pollfd {
+        fd,
+        events: libc::POLLIN,
+        revents: 0,
+    };
+    // SAFETY: a single valid pollfd and a zero timeout
+    unsafe { libc::poll(&mut pfd, 1, 0) == 1 && pfd.revents & libc::POLLIN != 0 }
+}
+
 #[tauri::command]
 fn pty_spawn(
     app: AppHandle,
@@ -31,6 +75,7 @@ fn pty_spawn(
     cols: u16,
     rows: u16,
     cwd: Option<String>,
+    output: Channel<InvokeResponseBody>,
 ) -> Result<(), String> {
     let pair = native_pty_system()
         .openpty(size(cols, rows))
@@ -51,45 +96,58 @@ fn pty_spawn(
     drop(pair.slave);
 
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
-    let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
+    let mut writer = pair.master.take_writer().map_err(|e| e.to_string())?;
+    let fd = pair.master.as_raw_fd();
+
+    let (input, input_rx) = std::sync::mpsc::channel::<Vec<u8>>();
+    std::thread::spawn(move || {
+        for data in input_rx {
+            if writer.write_all(&data).is_err() {
+                break;
+            }
+        }
+    });
 
     let pid = child.process_id();
     let session = Arc::new(PtySession {
         master: Mutex::new(pair.master),
-        writer: Mutex::new(writer),
+        input,
         child: Mutex::new(child),
         pid,
+        flow: Mutex::default(),
+        flow_cv: Condvar::new(),
     });
     state.0.lock().unwrap().insert(id.clone(), session.clone());
 
     std::thread::spawn(move || {
-        let mut buf = [0u8; 8192];
-        // A UTF-8 character may be split across two reads — the incomplete
-        // tail bytes are kept in `carry` until the next read.
-        let mut carry: Vec<u8> = Vec::new();
+        let mut buf = vec![0u8; CHUNK];
         loop {
-            match reader.read(&mut buf) {
+            let mut len = match reader.read(&mut buf) {
                 Ok(0) | Err(_) => break,
-                Ok(n) => {
-                    carry.extend_from_slice(&buf[..n]);
-                    let (text, rest) = match std::str::from_utf8(&carry) {
-                        Ok(s) => (s.to_owned(), Vec::new()),
-                        Err(e) if e.error_len().is_none() => {
-                            let valid = e.valid_up_to();
-                            (
-                                String::from_utf8_lossy(&carry[..valid]).into_owned(),
-                                carry[valid..].to_vec(),
-                            )
-                        }
-                        Err(_) => (String::from_utf8_lossy(&carry).into_owned(), Vec::new()),
-                    };
-                    if !text.is_empty() {
-                        let _ = app.emit(&format!("pty-output-{id}"), text);
-                    }
-                    carry = rest;
+                Ok(n) => n,
+            };
+            // Under heavy output, also take what is already waiting: fewer and
+            // bigger messages, while interactive echo still goes out at once
+            while len < CHUNK && fd.is_some_and(has_more_output) {
+                match reader.read(&mut buf[len..]) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => len += n,
+                }
+            }
+            // Raw bytes: xterm.js decodes UTF-8 itself, even when a character
+            // is split between two messages
+            let _ = output.send(InvokeResponseBody::Raw(buf[..len].to_vec()));
+
+            let mut flow = session.flow.lock().unwrap();
+            flow.unacked += len;
+            if flow.unacked > FLOW_HIGH {
+                while flow.unacked > FLOW_LOW && !flow.closed {
+                    flow = session.flow_cv.wait(flow).unwrap();
                 }
             }
         }
+        // Reap the shell so it doesn't linger as a zombie
+        let _ = session.child.lock().unwrap().wait();
         let _ = app.emit(&format!("pty-exit-{id}"), ());
         // Remove only THIS session from the map — if the id was reused
         // (e.g. after a page reload), leave the new session alone.
@@ -116,8 +174,29 @@ fn get_session(state: &State<PtyState>, id: &str) -> Result<Arc<PtySession>, Str
 #[tauri::command]
 fn pty_write(state: State<PtyState>, id: String, data: String) -> Result<(), String> {
     let session = get_session(&state, &id)?;
-    let mut writer = session.writer.lock().unwrap();
-    writer.write_all(data.as_bytes()).map_err(|e| e.to_string())
+    session
+        .input
+        .send(data.into_bytes())
+        .map_err(|e| e.to_string())
+}
+
+/// Raw bytes from xterm's onBinary (old-style mouse reports aren't valid UTF-8)
+#[tauri::command]
+fn pty_write_bytes(state: State<PtyState>, id: String, data: Vec<u8>) -> Result<(), String> {
+    let session = get_session(&state, &id)?;
+    session.input.send(data).map_err(|e| e.to_string())
+}
+
+/// The frontend reports how many output bytes xterm.js has processed
+#[tauri::command]
+fn pty_ack(state: State<PtyState>, id: String, bytes: usize) {
+    // A late ack for a session that already exited is simply dropped
+    let session = state.0.lock().unwrap().get(&id).cloned();
+    if let Some(session) = session {
+        let mut flow = session.flow.lock().unwrap();
+        flow.unacked = flow.unacked.saturating_sub(bytes);
+        session.flow_cv.notify_one();
+    }
 }
 
 #[tauri::command]
@@ -127,10 +206,12 @@ fn pty_resize(state: State<PtyState>, id: String, cols: u16, rows: u16) -> Resul
     master.resize(size(cols, rows)).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+// async: killing waits up to ~250 ms for the shell to exit — keep that off the main thread
+#[tauri::command(async)]
 fn pty_kill(state: State<PtyState>, id: String) -> Result<(), String> {
-    if let Some(session) = state.0.lock().unwrap().remove(&id) {
-        let _ = session.child.lock().unwrap().kill();
+    let session = state.0.lock().unwrap().remove(&id);
+    if let Some(session) = session {
+        session.kill();
     }
     Ok(())
 }
@@ -145,11 +226,11 @@ fn pty_cwd(state: State<PtyState>, id: String) -> Result<Option<String>, String>
         .map(|p| p.to_string_lossy().into_owned()))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn pty_kill_all(state: State<PtyState>) -> Result<(), String> {
     let sessions: Vec<_> = state.0.lock().unwrap().drain().collect();
     for (_, session) in sessions {
-        let _ = session.child.lock().unwrap().kill();
+        session.kill();
     }
     Ok(())
 }
@@ -166,7 +247,11 @@ fn settings_load(app: AppHandle) -> Result<Option<serde_json::Value>, String> {
         return Ok(None);
     }
     let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    Ok(Some(serde_json::from_str(&text).map_err(|e| e.to_string())?))
+    let value: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    if !value.is_object() {
+        return Err("expected a JSON object".into());
+    }
+    Ok(Some(value))
 }
 
 #[tauri::command]
@@ -197,6 +282,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             pty_spawn,
             pty_write,
+            pty_write_bytes,
+            pty_ack,
             pty_resize,
             pty_kill,
             pty_kill_all,

@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -9,6 +9,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SearchAddon } from "@xterm/addon-search";
+import { Unicode11Addon } from "@xterm/addon-unicode11";
 import "@xterm/xterm/css/xterm.css";
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from "./settings";
 import { getTheme } from "./theme";
@@ -207,6 +208,14 @@ function makePaneEl(id: string): HTMLElement {
   return el;
 }
 
+/** Processed output is acknowledged to the backend in batches of this size */
+const ACK_BYTES = 64 * 1024;
+
+/** Ctrl+click — so a plain click while selecting text doesn't open a link by accident */
+function openLink(e: MouseEvent, uri: string) {
+  if (e.ctrlKey) openUrl(uri).catch(() => {});
+}
+
 /** Opens a terminal inside an already placed .pane element and starts the shell */
 async function bootPane(tabId: string, el: HTMLElement, cwd: string | null) {
   const id = el.dataset.paneId!;
@@ -218,13 +227,19 @@ async function bootPane(tabId: string, el: HTMLElement, cwd: string | null) {
     scrollback: settings.scrollback,
     allowTransparency: true,
     theme: currentXtermTheme(),
+    // OSC 8 hyperlinks (`ls --hyperlink`, compiler output); http(s) only
+    linkHandler: { activate: openLink },
+    // Needed for term.unicode below
+    allowProposedApi: true,
   });
   const fit = new FitAddon();
   term.loadAddon(fit);
   const search = new SearchAddon();
   term.loadAddon(search);
-  // Ctrl+click — so a plain click while selecting text doesn't open a link by accident
-  term.loadAddon(new WebLinksAddon((e, uri) => e.ctrlKey && openUrl(uri)));
+  term.loadAddon(new WebLinksAddon(openLink));
+  // Unicode 11 widths — emoji and CJK take two cells, so prompts don't drift
+  term.loadAddon(new Unicode11Addon());
+  term.unicode.activeVersion = "11";
   term.open(el);
 
   // The WebGL renderer can't draw a transparent background — stay on the DOM renderer while matrix is on
@@ -252,13 +267,27 @@ async function bootPane(tabId: string, el: HTMLElement, cwd: string | null) {
       : `${resultCount}+`;
   });
 
-  // Listeners go BEFORE spawn so the shell's first prompt isn't lost
-  pane.unlisteners.push(
-    await listen<string>(`pty-output-${id}`, (e) => term.write(e.payload)),
-  );
+  // Shell output arrives as raw bytes. Once xterm.js has processed a chunk we
+  // acknowledge it, and the backend pauses reading while too much is unacked.
+  const output = new Channel<ArrayBuffer>();
+  let processed = 0;
+  output.onmessage = (buf) => {
+    term.write(new Uint8Array(buf), () => {
+      processed += buf.byteLength;
+      if (processed >= ACK_BYTES) {
+        invoke("pty_ack", { id, bytes: processed });
+        processed = 0;
+      }
+    });
+  };
+  // Listen BEFORE spawn so an immediate exit isn't missed
   pane.unlisteners.push(await listen(`pty-exit-${id}`, () => closePane(id, true)));
 
   term.onData((data) => invoke("pty_write", { id, data }));
+  // Old-style mouse reports are raw bytes, not UTF-8 text
+  term.onBinary((data) =>
+    invoke("pty_write_bytes", { id, data: Array.from(data, (c) => c.charCodeAt(0)) }),
+  );
   term.onResize(({ cols, rows }) => invoke("pty_resize", { id, cols, rows }));
   term.onTitleChange((t) => {
     pane.title = t || "shell";
@@ -272,7 +301,11 @@ async function bootPane(tabId: string, el: HTMLElement, cwd: string | null) {
   el.addEventListener("focusin", () => setActivePane(id));
 
   safeFit(pane);
-  await invoke("pty_spawn", { id, cols: term.cols, rows: term.rows, cwd });
+  try {
+    await invoke("pty_spawn", { id, cols: term.cols, rows: term.rows, cwd, output });
+  } catch (e) {
+    term.write(`\x1b[31mCould not start the shell: ${e}\x1b[0m\r\n`);
+  }
   setActivePane(id);
   term.focus();
 }
@@ -674,9 +707,26 @@ function applySettingsToTerms() {
 }
 
 async function reloadSettings() {
-  settings = await loadSettings();
+  const { settings: loaded, error } = await loadSettings();
+  // A broken file keeps the current settings instead of resetting everything
+  if (loaded) settings = loaded;
+  showToast(error ?? "Settings reloaded", !!error);
   applyMatrix();
   applySettingsToTerms();
+}
+
+// ---------- Notifications ----------
+
+let toastTimer = 0;
+
+/** Shows a short message in the bottom corner; errors stay longer */
+function showToast(text: string, isError = false) {
+  const el = document.getElementById("toast")!;
+  el.textContent = text;
+  el.classList.toggle("error", isError);
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => (el.hidden = true), isError ? 10000 : 2500);
 }
 
 // ---------- Startup ----------
@@ -684,10 +734,14 @@ async function reloadSettings() {
 async function main() {
   // If the page was reloaded, kill the shells left over from the previous session
   await invoke("pty_kill_all").catch(() => {});
-  settings = await loadSettings();
+  const { settings: loaded, error } = await loadSettings();
+  settings = loaded ?? { ...DEFAULT_SETTINGS };
   matrix = new MatrixRain(document.getElementById("matrix") as HTMLCanvasElement);
   applyCssTheme();
   applyMatrix();
+  if (error) showToast(error, true);
+  const toast = document.getElementById("toast")!;
+  toast.addEventListener("click", () => (toast.hidden = true));
 
   document.getElementById("newtab")!.addEventListener("click", () => newTab());
   initSearchBar();

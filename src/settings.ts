@@ -20,18 +20,48 @@ export const DEFAULT_SETTINGS: Settings = {
   scrollback: 10000,
 };
 
-export async function loadSettings(): Promise<Settings> {
-  const saved = await invoke<Record<string, unknown> | null>(
-    "settings_load",
-  ).catch(() => null);
+export interface LoadResult {
+  /** null when settings.json exists but can't be parsed */
+  settings: Settings | null;
+  /** A problem worth showing to the user */
+  error?: string;
+}
+
+/** While settings.json is broken we never write to it — that would wipe the user's edits */
+let fileBroken = false;
+
+export async function loadSettings(): Promise<LoadResult> {
+  let saved: Record<string, unknown> | null;
+  try {
+    saved = await invoke("settings_load");
+  } catch (e) {
+    fileBroken = true;
+    return {
+      settings: null,
+      error: `settings.json is invalid (${e}).\nChanges won't be saved until it's fixed.`,
+    };
+  }
+  fileBroken = false;
   if (!saved) {
     // Create the file on first run so the user can open it with Ctrl+, and edit it
     await saveSettings(DEFAULT_SETTINGS).catch(() => {});
-    return { ...DEFAULT_SETTINGS };
+    return { settings: { ...DEFAULT_SETTINGS } };
   }
-  return { ...DEFAULT_SETTINGS, ...saved } as Settings;
+  const settings = { ...DEFAULT_SETTINGS, ...saved } as Settings;
+  // A value of the wrong type (e.g. "fontSize": "14") falls back to the default
+  const wrong = (Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]).filter(
+    (k) => typeof settings[k] !== typeof DEFAULT_SETTINGS[k],
+  );
+  for (const k of wrong) Object.assign(settings, { [k]: DEFAULT_SETTINGS[k] });
+  return {
+    settings,
+    error: wrong.length
+      ? `settings.json: invalid ${wrong.join(", ")} — using the default`
+      : undefined,
+  };
 }
 
 export async function saveSettings(settings: Settings): Promise<void> {
+  if (fileBroken) return;
   await invoke("settings_save", { settings });
 }

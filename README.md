@@ -92,6 +92,11 @@ src-tauri/icons/icon.svg  # icon source (sizes generated with `npx tauri icon`)
 - xterm.js ignores alpha in the theme background, so in matrix mode the
   transparency comes from CSS (`body.matrix`) and the `#shade` overlay; the
   WebGL renderer is disabled in that mode (it comes back when matrix is off).
+- Shell output is streamed to the webview as raw bytes over a Tauri channel
+  with flow control: the frontend acknowledges what xterm.js has processed,
+  and the backend stops reading from the PTY while more than 1 MiB is
+  unacknowledged. A flood like `yes` slows the program down instead of
+  freezing the window.
 - The webview's clipboard API doesn't work in WebKitGTK, so
   `tauri-plugin-clipboard-manager` is used instead.
 
