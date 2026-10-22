@@ -292,7 +292,10 @@ fn settings_open(app: AppHandle) -> Result<(), String> {
         use gio::prelude::*;
         if let Some(editor) = gio::AppInfo::default_for_type("text/plain", false) {
             let file = gio::File::for_path(&path);
-            if editor.launch(&[file], None::<&gio::AppLaunchContext>).is_ok() {
+            if editor
+                .launch(&[file], None::<&gio::AppLaunchContext>)
+                .is_ok()
+            {
                 return Ok(());
             }
         }

@@ -1,0 +1,49 @@
+name: Release
+
+# Pushing a tag like v0.1.1 builds the Linux packages and attaches them to a
+# draft GitHub release. Review the draft on GitHub, then publish it.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    # The oldest supported Ubuntu: packages built against an older glibc run on more distros
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev patchelf
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Ascy ${{ github.ref_name }}
+          releaseDraft: true
+          args: --bundles deb,appimage
+          releaseBody: |
+            Linux x86_64 packages:
+
+            - **.deb** (Debian, Ubuntu and derivatives): `sudo apt install ./Ascy_*_amd64.deb`
+            - **.AppImage** (any distro): `chmod +x Ascy_*.AppImage && ./Ascy_*.AppImage`
