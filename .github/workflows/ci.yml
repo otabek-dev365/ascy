@@ -5,16 +5,23 @@ on:
     branches: [main]
   pull_request:
 
+# A new push cancels the run that is still going for the same branch
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-22.04
+    # A stuck runner (it happens in apt) gives up instead of hanging for hours
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
       - name: Install system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y libwebkit2gtk-4.1-dev librsvg2-dev
 
       - uses: actions/setup-node@v7
         with:
