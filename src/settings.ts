@@ -5,7 +5,7 @@ export interface Settings {
   fontSize: number;
   theme: "night" | "hacker";
   matrix: boolean;
-  /** Matrix ustidagi qoraytirish darajasi: 0 (parda yo'q) .. 0.9 (deyarli qora) */
+  /** How much the matrix rain is dimmed: 0 (no shade) .. 0.9 (almost black) */
   shade: number;
   scrollback: number;
 }
@@ -25,7 +25,7 @@ export async function loadSettings(): Promise<Settings> {
     "settings_load",
   ).catch(() => null);
   if (!saved) {
-    // Birinchi ishga tushirishda faylni yaratamiz — foydalanuvchi Ctrl+, bilan ochib tahrirlaydi
+    // Create the file on first run so the user can open it with Ctrl+, and edit it
     await saveSettings(DEFAULT_SETTINGS).catch(() => {});
     return { ...DEFAULT_SETTINGS };
   }

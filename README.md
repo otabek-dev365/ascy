@@ -1,84 +1,100 @@
 # Ascy
 
-*"ASK-ee" deb o'qiladi — ASCII kabi.*
+*Pronounced "ASK-ee", like ASCII.*
 
-Terminal emulyator — Tauri 2 (Rust) + xterm.js 6. Hacker-uslub: qora fon, fosfor-yashil matn, orqada Matrix yomg'iri.
+A hacker-style terminal emulator built with Tauri 2 (Rust) and xterm.js 6:
+black background, phosphor-green text and an optional Matrix rain behind it.
 
-## Imkoniyatlar
+> **Platform:** Linux only for now (the working directory of a shell is read
+> from `/proc`, and only a `.deb` package is built).
 
-- Tablar va split-panellar (ichma-ich, sichqoncha bilan o'lchanadi)
-- Ikki tema: `hacker` va `night` (Tokyo Night uslubi)
-- Matrix fon animatsiyasi (sozlanadigan qoraytirish pardasi bilan)
-- Yangi tab/panel faol shell'ning papkasida ochiladi
-- Scrollback ichida qidiruv, URL'lar Ctrl+klik bilan ochiladi
-- Fayl sudrab tashlansa, yo'li terminalga yoziladi (drag & drop)
-- Sozlamalar JSON faylda, qayta ishga tushirmasdan qo'llanadi
-- ☰ menyu: tema, matrix, parda va shrift jonli slayderlar bilan
+## Features
 
-## Tugmalar
+- Tabs and split panes (nested, resizable with the mouse)
+- Two themes: `hacker` and `night` (Tokyo Night style)
+- Matrix rain background with an adjustable shade
+- New tabs and panes open in the active shell's directory
+- Scrollback search; URLs open with Ctrl+click
+- Drag & drop a file to type its path into the shell
+- JSON settings file, applied live without a restart
+- ☰ menu: theme, matrix toggle, shade and font size sliders
 
-| Tugma | Vazifa |
+## Keyboard shortcuts
+
+| Keys | Action |
 |---|---|
-| `Ctrl+Shift+T` / `W` | Yangi tab / panelni yopish |
-| `Ctrl+PgUp` / `PgDn` | Tablar orasida yurish |
-| `Alt+1..9` | N-tabga sakrash |
-| `Ctrl+Shift+E` / `O` | Split: yonma-yon / tepama-tepa |
-| `Alt+←→↑↓` | Panellar orasida yurish |
-| `Ctrl+Shift+C` / `V` | Nusxalash / qo'yish |
-| `Ctrl+Shift+F` | Qidiruv (Enter — keyingi, Shift+Enter — oldingi, Esc — yopish) |
-| `Ctrl` + `+` / `-` / `0` | Shrift kattaroq / kichikroq / aslicha |
-| `Ctrl+Shift+M` | Matrix yoqish/o'chirish |
-| `Ctrl+Shift+P` | Tema almashtirish (hacker ⇄ night) |
-| `Ctrl+,` | Sozlamalar faylini ochish |
-| `Ctrl+Shift+R` | Sozlamalarni qayta yuklash |
+| `Ctrl+Shift+T` / `W` | New tab / close pane |
+| `Ctrl+PgUp` / `PgDn` | Previous / next tab |
+| `Alt+1..9` | Jump to tab N |
+| `Ctrl+Shift+E` / `O` | Split side by side / stacked |
+| `Alt+←→↑↓` | Move between panes |
+| `Ctrl+Shift+C` / `V` | Copy / paste |
+| `Ctrl+Shift+F` | Search (Enter — next, Shift+Enter — previous, Esc — close) |
+| `Ctrl` + `+` / `-` / `0` | Font bigger / smaller / reset |
+| `Ctrl+Shift+M` | Toggle matrix rain |
+| `Ctrl+Shift+P` | Switch theme (hacker ⇄ night) |
+| `Ctrl+,` | Open the settings file |
+| `Ctrl+Shift+R` | Reload settings |
 
-## Sozlamalar
+## Settings
 
-`~/.config/uz.otabek.ascy/settings.json`:
+`~/.config/uz.otabek.ascy/settings.json` (created on first run):
 
 ```json
 {
-  "fontFamily": "...",   // shriftlar ro'yxati
+  "fontFamily": "\"JetBrains Mono\", \"Fira Code\", \"DejaVu Sans Mono\", monospace",
   "fontSize": 14,
-  "theme": "hacker",     // "hacker" | "night"
-  "matrix": true,        // fon animatsiyasi
-  "shade": 0.28,         // matrix qoraytirishi: 0 (yo'q) .. 0.9 (qora)
-  "scrollback": 10000    // tarix qatorlari
+  "theme": "hacker",
+  "matrix": true,
+  "shade": 0.28,
+  "scrollback": 10000
 }
 ```
 
-## Ishlab chiqish
+| Key | Meaning |
+|---|---|
+| `fontFamily` | CSS font list |
+| `fontSize` | Font size in px (8–28) |
+| `theme` | `"hacker"` or `"night"` |
+| `matrix` | Matrix rain background on/off |
+| `shade` | How much the rain is dimmed: `0` (none) … `0.9` (almost black) |
+| `scrollback` | Number of history lines kept per pane |
+
+## Building
+
+Requirements: Node.js, Rust ([rustup](https://rustup.rs)) and the
+[Tauri prerequisites for Linux](https://v2.tauri.app/start/prerequisites/)
+(`libwebkit2gtk-4.1-dev`, plus `librsvg2-dev` for packaging).
 
 ```bash
-npm install               # birinchi marta
-npm run tauri dev         # dev-rejim (hot reload)
-npm run tauri build       # release + .deb paket
+npm install               # first time only
+npm run tauri dev         # development mode with hot reload
+npm run tauri build       # release build + .deb package
 ```
 
-`.deb` natijasi: `src-tauri/target/release/bundle/deb/` — o'rnatish:
-`sudo apt install ./Ascy_*.deb`, o'chirish: `sudo apt remove ascy`.
+The package lands in `src-tauri/target/release/bundle/deb/`.
+Install with `sudo apt install ./Ascy_*.deb`, remove with `sudo apt remove ascy`.
 
-Talablar: Node.js, Rust (rustup), `libwebkit2gtk-4.1-dev`, `librsvg2-dev` (faqat paket yig'ish uchun).
-
-## Tuzilma
+## Project layout
 
 ```
-src/                    # frontend (TypeScript)
-  main.ts               #   tab/panel boshqaruvi, tugmalar
-  theme.ts              #   temalar (hacker, night)
-  matrix.ts             #   Matrix yomg'iri (canvas)
-  settings.ts           #   sozlamalarni yuklash/saqlash
-src-tauri/src/lib.rs    # backend (Rust): PTY, sozlamalar buyruqlari
-src-tauri/icons/icon.svg# ikonka manbasi (o'lchamlar: npx tauri icon)
+src/                      # frontend (TypeScript)
+  main.ts                 #   tabs, panes, shortcuts, menu, search
+  theme.ts                #   themes (hacker, night)
+  matrix.ts               #   Matrix rain (canvas)
+  settings.ts             #   loading/saving settings
+src-tauri/src/lib.rs      # backend (Rust): PTY sessions, settings commands
+src-tauri/icons/icon.svg  # icon source (sizes generated with `npx tauri icon`)
 ```
 
-## Texnik eslatmalar
+## Technical notes
 
-- xterm.js fon shaffofligini qo'llamaydi — matrix rejimida shaffoflik CSS
-  (`body.matrix`) va `#shade` pardasi orqali; WebGL renderer bu rejimda
-  o'chiriladi (matrix o'chiq bo'lsa avtomatik qaytadi).
-- Clipboard webview'da ishlamaydi — `tauri-plugin-clipboard-manager` ishlatiladi.
+- xterm.js ignores alpha in the theme background, so in matrix mode the
+  transparency comes from CSS (`body.matrix`) and the `#shade` overlay; the
+  WebGL renderer is disabled in that mode (it comes back when matrix is off).
+- The webview's clipboard API doesn't work in WebKitGTK, so
+  `tauri-plugin-clipboard-manager` is used instead.
 
-## Litsenziya
+## License
 
 [MIT](LICENSE)

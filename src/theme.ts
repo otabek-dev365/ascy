@@ -2,15 +2,15 @@ import type { ITheme } from "@xterm/xterm";
 
 export interface AppTheme {
   xterm: ITheme;
-  /** Oddiy rejimdagi fon */
+  /** Background in normal mode */
   bgOpaque: string;
-  /** Matrix yoqilganda — orqadagi animatsiya ko'rinishi uchun yarim shaffof fon */
+  /** Semi-transparent background so the matrix animation shows through */
   bgTransparent: string;
-  /** Tab-bar va umumiy UI ranglari (CSS o'zgaruvchilari) */
+  /** Tab bar and general UI colors (CSS variables) */
   css: Record<string, string>;
 }
 
-// Tokyo Night uslubi — to'q ko'k-qora fon, yumshoq oq matn, ko'k papkalar
+// Tokyo Night style — dark blue-black background, soft white text, blue directories
 const night: AppTheme = {
   bgOpaque: "#16161e",
   bgTransparent: "#16161eb0",
@@ -81,7 +81,7 @@ const hacker: AppTheme = {
   },
 };
 
-// "mocha" — eski sozlama fayllari uchun taxallus (night bilan almashtirilgan)
+// "mocha" — alias for old settings files (replaced by night)
 export const themes: Record<string, AppTheme> = { night, hacker, mocha: night };
 
 export function getTheme(name: string): AppTheme {

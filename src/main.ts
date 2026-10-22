@@ -40,13 +40,13 @@ let activeTabId: string | null = null;
 let settings: Settings;
 let matrix: MatrixRain;
 
-// Sahifa qayta yuklanganda (dev HMR) eski sessiya bilan to'qnashmasligi uchun unikal ID
+// Unique IDs so a page reload (dev HMR) never collides with an old session
 const newId = () => `t-${crypto.randomUUID().slice(0, 8)}`;
 
 const tabsEl = () => document.getElementById("tabs")!;
 const termsEl = () => document.getElementById("terms")!;
 
-// Panel o'lchami o'zgarganda (split, oyna resize, tab almashish) avtomatik fit
+// Refit a pane whenever its size changes (split, window resize, tab switch)
 const paneRO = new ResizeObserver((entries) => {
   for (const entry of entries) {
     const pane = panes.get((entry.target as HTMLElement).dataset.paneId ?? "");
@@ -86,7 +86,7 @@ function applyCssTheme() {
   }
 }
 
-// ---------- Klaviatura qisqartmalari ----------
+// ---------- Keyboard shortcuts ----------
 
 type Action =
   | "newtab" | "closepane" | "next" | "prev"
@@ -151,8 +151,8 @@ function runShortcut(action: Action) {
     case "paste": {
       const pane = activePane();
       if (pane) {
-        // term.paste() bracketed-paste rejimini hurmat qiladi — ko'p qatorli
-        // matn shell'da darhol bajarilib ketmaydi
+        // term.paste() honors bracketed paste mode — multi-line text
+        // is not executed by the shell right away
         readText()
           .then((t) => t && pane.term.paste(t))
           .catch(() => {});
@@ -198,7 +198,7 @@ function runShortcut(action: Action) {
   }
 }
 
-// ---------- Panel boshqaruvi ----------
+// ---------- Pane management ----------
 
 function makePaneEl(id: string): HTMLElement {
   const el = document.createElement("div");
@@ -207,7 +207,7 @@ function makePaneEl(id: string): HTMLElement {
   return el;
 }
 
-/** Tayyor joylashtirilgan .pane elementi ichida terminal ochib, shell'ni ishga tushiradi */
+/** Opens a terminal inside an already placed .pane element and starts the shell */
 async function bootPane(tabId: string, el: HTMLElement, cwd: string | null) {
   const id = el.dataset.paneId!;
 
@@ -223,11 +223,11 @@ async function bootPane(tabId: string, el: HTMLElement, cwd: string | null) {
   term.loadAddon(fit);
   const search = new SearchAddon();
   term.loadAddon(search);
-  // Ctrl+klik — oddiy klik matn belgilashda tasodifan link ochib yubormasin
+  // Ctrl+click — so a plain click while selecting text doesn't open a link by accident
   term.loadAddon(new WebLinksAddon((e, uri) => e.ctrlKey && openUrl(uri)));
   term.open(el);
 
-  // WebGL renderer shaffof fonni chizmaydi — matrix yoqiq bo'lsa DOM rendererda qolamiz
+  // The WebGL renderer can't draw a transparent background — stay on the DOM renderer while matrix is on
   let webgl: WebglAddon | null = null;
   if (!settings.matrix) {
     try {
@@ -245,14 +245,14 @@ async function bootPane(tabId: string, el: HTMLElement, cwd: string | null) {
   search.onDidChangeResults(({ resultIndex, resultCount }) => {
     if (searchPaneId !== id) return;
     const countEl = document.getElementById("searchcount")!;
-    // 1000+ moslikda addon indeksni hisoblamaydi (resultIndex = -1)
+    // With 1000+ matches the addon doesn't compute the index (resultIndex = -1)
     countEl.textContent =
       resultCount <= 0 ? "0/0"
       : resultIndex >= 0 ? `${resultIndex + 1}/${resultCount}`
       : `${resultCount}+`;
   });
 
-  // Listener'lar spawn'dan OLDIN — shell'ning birinchi prompti yo'qolmasligi uchun
+  // Listeners go BEFORE spawn so the shell's first prompt isn't lost
   pane.unlisteners.push(
     await listen<string>(`pty-output-${id}`, (e) => term.write(e.payload)),
   );
@@ -277,7 +277,7 @@ async function bootPane(tabId: string, el: HTMLElement, cwd: string | null) {
   term.focus();
 }
 
-/** Faol panelning shell'i qaysi papkada turganini so'raymiz */
+/** Asks which directory the active pane's shell is in */
 async function cwdOfActivePane(): Promise<string | null> {
   const pane = activePane();
   if (!pane) return null;
@@ -298,7 +298,7 @@ async function newTab() {
   titleEl.textContent = "shell";
   const closeEl = document.createElement("button");
   closeEl.textContent = "×";
-  closeEl.title = "Tabni yopish";
+  closeEl.title = "Close tab";
   closeEl.addEventListener("click", (ev) => {
     ev.stopPropagation();
     closeTab(tabId);
@@ -315,7 +315,7 @@ async function newTab() {
   await bootPane(tabId, el, cwd);
 }
 
-/** Ikki panel orasidagi sichqoncha bilan tortiladigan ajratgich */
+/** Mouse-draggable divider between two panes */
 function makeGutter(dir: "row" | "col", wrap: HTMLElement): HTMLElement {
   const g = document.createElement("div");
   g.className = `gutter ${dir}`;
@@ -344,7 +344,7 @@ function makeGutter(dir: "row" | "col", wrap: HTMLElement): HTMLElement {
   return g;
 }
 
-/** Faol panelni ikkiga bo'lish: row = yonma-yon, col = tepama-tepa */
+/** Splits the active pane in two: row = side by side, col = stacked */
 async function split(dir: "row" | "col") {
   const pane = activePane();
   if (!pane) return;
@@ -353,7 +353,7 @@ async function split(dir: "row" | "col") {
   const parent = pane.el.parentElement!;
   const wrap = document.createElement("div");
   wrap.className = `split ${dir}`;
-  // Panelning tashqi split'dagi ulushi (inline flex) o'ramga o'tadi
+  // The pane's share in the outer split (inline flex) moves to the wrapper
   wrap.style.flex = pane.el.style.flex;
   pane.el.style.flex = "";
   parent.insertBefore(wrap, pane.el);
@@ -376,13 +376,13 @@ function closePane(paneId: string, fromExit = false) {
   pane.term.dispose();
 
   const parent = pane.el.parentElement;
-  // Panelga yondosh gutter ham birga ketadi
+  // Remove the adjacent gutter together with the pane
   if (parent?.classList.contains("split")) {
     const sib = pane.el.previousElementSibling ?? pane.el.nextElementSibling;
     if (sib?.classList.contains("gutter")) sib.remove();
   }
   pane.el.remove();
-  // Split ichida bitta bola qolsa, o'ramni yechamiz — daraxt tekislanadi
+  // If a split is left with one child, unwrap it — keeps the tree flat
   if (parent?.classList.contains("split") && parent.children.length === 1) {
     const child = parent.firstElementChild as HTMLElement;
     child.style.flex = parent.style.flex;
@@ -403,7 +403,7 @@ function closePane(paneId: string, fromExit = false) {
 }
 
 function closeTab(tabId: string) {
-  // Har bir panelni yopamiz — oxirgisi tabning o'zini ham olib ketadi
+  // Close every pane — the last one takes the tab with it
   for (const pane of panesOfTab(tabId)) closePane(pane.id);
 }
 
@@ -449,7 +449,7 @@ function setActivePane(paneId: string) {
   if (activeTabId === pane.tabId) syncWindowTitle();
 }
 
-/** Alt+strelka — geometrik jihatdan eng yaqin qo'shni panelga o'tish */
+/** Alt+arrow — move to the geometrically nearest pane in that direction */
 function navigate(arrowCode: string) {
   const cur = activePane();
   if (!cur || !activeTabId) return;
@@ -492,11 +492,11 @@ function syncWindowTitle() {
   getCurrentWindow().setTitle(activePane()?.title || "Ascy");
 }
 
-// ---------- Qidiruv (Ctrl+Shift+F) ----------
+// ---------- Search (Ctrl+Shift+F) ----------
 
 let searchPaneId: string | null = null;
 
-// Sariq-to'q sariq belgilash ikkala temada ham yaxshi o'qiladi
+// Yellow/orange highlights read well in both themes
 const SEARCH_DECORATIONS = {
   matchBackground: "#e0af6845",
   matchOverviewRuler: "#e0af68",
@@ -510,7 +510,7 @@ const searchInput = () => document.getElementById("searchinput") as HTMLInputEle
 function openSearch() {
   const pane = activePane();
   if (!pane) return;
-  // Qidiruv boshqa panelda ochiq qolgan bo'lsa, uning belgilashlarini tozalaymiz
+  // If search was left open in another pane, clear its highlights
   if (searchPaneId && searchPaneId !== pane.id) {
     panes.get(searchPaneId)?.search.clearDecorations();
   }
@@ -547,7 +547,7 @@ function initSearchBar() {
   searchInput().addEventListener("keydown", (e) => {
     if (e.code === "Escape") closeSearch();
     else if (e.code === "Enter") doSearch(e.shiftKey ? -1 : 1);
-    // Yozilayotgan harflar global qisqartma ishlovchisiga yetib bormasin
+    // Keep typed keys away from the global shortcut handler
     e.stopPropagation();
   });
   searchInput().addEventListener("input", () => doSearch(1, true));
@@ -556,11 +556,11 @@ function initSearchBar() {
   document.getElementById("searchclose")!.addEventListener("click", () => closeSearch());
 }
 
-// ---------- Menyu (☰) ----------
+// ---------- Menu (☰) ----------
 
 const menuEl = () => document.getElementById("menu")!;
 
-/** Panel ochilganda boshqaruvlarga joriy sozlamalarni yozamiz */
+/** Fills the controls with the current settings when the panel opens */
 function syncMenu() {
   (document.getElementById("m-theme") as HTMLSelectElement).value = settings.theme;
   (document.getElementById("m-matrix") as HTMLInputElement).checked = settings.matrix;
@@ -586,7 +586,7 @@ function initMenu() {
     e.stopPropagation();
     toggleMenu();
   });
-  // Paneldan tashqariga bosilsa yopiladi
+  // Close when clicking outside the panel
   el.addEventListener("click", (e) => e.stopPropagation());
   document.addEventListener("click", () => {
     if (!el.hidden) toggleMenu(false);
@@ -607,7 +607,7 @@ function initMenu() {
     saveSettings(settings);
   });
 
-  // Slayderlar surilganda jonli qo'llanadi, qo'yib yuborilganda faylga saqlanadi
+  // Sliders apply live while dragging and are saved to the file on release
   const shadeInput = document.getElementById("m-shade") as HTMLInputElement;
   shadeInput.addEventListener("input", () => {
     settings.shade = Number(shadeInput.value) / 100;
@@ -631,7 +631,7 @@ function initMenu() {
   });
 }
 
-// ---------- Sozlamalar ----------
+// ---------- Settings ----------
 
 function zoom(dir: number) {
   settings.fontSize =
@@ -653,7 +653,7 @@ function applyMatrix() {
 function applySettingsToTerms() {
   applyCssTheme();
   for (const p of panes.values()) {
-    // Matrix ⇄ WebGL almashinuvi: shaffoflik faqat DOM rendererda ishlaydi
+    // Matrix ⇄ WebGL switch: transparency only works with the DOM renderer
     if (settings.matrix && p.webgl) {
       p.webgl.dispose();
       p.webgl = null;
@@ -679,10 +679,10 @@ async function reloadSettings() {
   applySettingsToTerms();
 }
 
-// ---------- Ishga tushirish ----------
+// ---------- Startup ----------
 
 async function main() {
-  // Sahifa qayta yuklangan bo'lsa, oldingi sessiyalarning shell'larini tozalaymiz
+  // If the page was reloaded, kill the shells left over from the previous session
   await invoke("pty_kill_all").catch(() => {});
   settings = await loadSettings();
   matrix = new MatrixRain(document.getElementById("matrix") as HTMLCanvasElement);
@@ -700,8 +700,8 @@ async function main() {
     }
   });
 
-  // Fayl sudrab tashlansa, yo'li faol shell'ga yoziladi.
-  // Maxsus belgili yo'llar single-quote ichiga olinadi (POSIX qoidasi).
+  // Dropped files are typed into the active shell as paths.
+  // Paths with special characters are single-quoted (POSIX rules).
   const quotePath = (p: string) =>
     /^[A-Za-z0-9_\-./~:@%+=,]+$/.test(p) ? p : `'${p.replace(/'/g, "'\\''")}'`;
   await getCurrentWebview().onDragDropEvent((event) => {

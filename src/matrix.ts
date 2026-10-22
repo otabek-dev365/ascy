@@ -1,4 +1,4 @@
-/** Klassik "Matrix rain" — terminal orqasidagi canvas'da yashil belgilar yog'adi. */
+/** Classic "Matrix rain" — green glyphs falling on a canvas behind the terminal. */
 export class MatrixRain {
   private ctx: CanvasRenderingContext2D;
   private drops: number[] = [];
@@ -12,7 +12,7 @@ export class MatrixRain {
   constructor(private canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext("2d")!;
     window.addEventListener("resize", () => this.running && this.resize());
-    // Oyna yashirilganda animatsiyani to'xtatamiz — CPU bekorga ishlamasin
+    // Pause the animation while the window is hidden so it doesn't waste CPU
     document.addEventListener("visibilitychange", () => {
       if (!this.running) return;
       cancelAnimationFrame(this.raf);
@@ -50,7 +50,7 @@ export class MatrixRain {
   private loop = () => {
     this.raf = requestAnimationFrame(this.loop);
     const now = performance.now();
-    if (now - this.last < 55) return; // ~18 FPS — silliq va tejamkor
+    if (now - this.last < 55) return; // ~18 FPS — smooth and cheap
     this.last = now;
     this.step();
   };
@@ -58,7 +58,7 @@ export class MatrixRain {
   private step() {
     const { width, height } = this.canvas;
     const ctx = this.ctx;
-    // Har kadrda yarim shaffof qora qatlam — eski belgilar asta so'nib "dum" hosil qiladi
+    // A translucent black layer every frame — old glyphs slowly fade, leaving a "tail"
     ctx.fillStyle = "rgba(0, 0, 0, 0.08)";
     ctx.fillRect(0, 0, width, height);
     ctx.font = `${this.fontSize}px monospace`;

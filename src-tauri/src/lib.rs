@@ -64,8 +64,8 @@ fn pty_spawn(
 
     std::thread::spawn(move || {
         let mut buf = [0u8; 8192];
-        // PTY oqimi UTF-8 belgini ikki read o'rtasida bo'lib yuborishi mumkin —
-        // chala qolgan baytlar keyingi o'qishgacha carry'da saqlanadi.
+        // A UTF-8 character may be split across two reads — the incomplete
+        // tail bytes are kept in `carry` until the next read.
         let mut carry: Vec<u8> = Vec::new();
         loop {
             match reader.read(&mut buf) {
@@ -91,8 +91,8 @@ fn pty_spawn(
             }
         }
         let _ = app.emit(&format!("pty-exit-{id}"), ());
-        // Xarita'dan faqat AYNAN SHU sessiyani o'chiramiz — id qayta ishlatilgan
-        // bo'lsa (masalan, sahifa qayta yuklanganda), yangi sessiyaga tegmaymiz.
+        // Remove only THIS session from the map — if the id was reused
+        // (e.g. after a page reload), leave the new session alone.
         let state = app.state::<PtyState>();
         let mut map = state.0.lock().unwrap();
         if map.get(&id).is_some_and(|cur| Arc::ptr_eq(cur, &session)) {
@@ -110,7 +110,7 @@ fn get_session(state: &State<PtyState>, id: &str) -> Result<Arc<PtySession>, Str
         .unwrap()
         .get(id)
         .cloned()
-        .ok_or_else(|| format!("PTY sessiya topilmadi: {id}"))
+        .ok_or_else(|| format!("PTY session not found: {id}"))
 }
 
 #[tauri::command]
@@ -135,7 +135,7 @@ fn pty_kill(state: State<PtyState>, id: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Shell'ning joriy papkasi — yangi tab/panel o'sha yerda ochilishi uchun
+/// The shell's current directory — so a new tab/pane opens in the same place
 #[tauri::command]
 fn pty_cwd(state: State<PtyState>, id: String) -> Result<Option<String>, String> {
     let session = get_session(&state, &id)?;

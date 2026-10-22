@@ -27,7 +27,7 @@ body {
   display: none;
 }
 
-/* Matn o'qilishi uchun yomg'ir ustidagi yarim shaffof parda */
+/* Translucent shade over the rain to keep text readable */
 #shade {
   position: fixed;
   inset: 0;
@@ -40,9 +40,9 @@ body.matrix #shade {
   display: block;
 }
 
-/* xterm 6 theme orqali shaffof fonni qo'llamaydi — CSS bilan majburlaymiz.
-   Matrix rejimida terminalning standart foni butunlay shaffof bo'ladi,
-   qoraytirishni yuqoridagi #shade beradi. */
+/* xterm 6 ignores alpha in the theme background, so transparency is forced
+   with CSS. In matrix mode the terminal background is fully transparent and
+   the dimming comes from #shade above. */
 body.matrix .xterm,
 body.matrix .xterm-viewport,
 body.matrix .xterm-screen,
@@ -141,7 +141,7 @@ body.matrix .xterm-rows {
   background: var(--tab-active);
 }
 
-/* ☰ sozlamalar paneli */
+/* ☰ settings panel */
 #menu {
   position: fixed;
   top: 38px;
@@ -230,7 +230,7 @@ body.matrix .xterm-rows {
   border-color: var(--accent);
 }
 
-/* Qidiruv paneli (Ctrl+Shift+F) */
+/* Search bar (Ctrl+Shift+F) */
 #searchbar {
   position: fixed;
   top: 40px;
@@ -283,7 +283,7 @@ body.matrix .xterm-rows {
   background: var(--tab-active);
 }
 
-/* Fayl sudrab kelinganda chegara ko'rsatkichi */
+/* Outline shown while a file is dragged over the window */
 body.dragover #terms {
   outline: 2px dashed var(--accent);
   outline-offset: -6px;
@@ -340,7 +340,7 @@ body.dragover #terms {
   border: 1px solid transparent;
 }
 
-/* Bo'lingan tabda panellar chegara bilan ajratiladi; faolida — accent rang */
+/* In a split tab panes get a border; the focused one uses the accent color */
 .split .pane {
   border-color: var(--border);
 }
@@ -353,7 +353,7 @@ body.dragover #terms {
   height: 100%;
 }
 
-/* Panellar orasidagi tortiladigan ajratgich */
+/* Draggable divider between panes */
 .split > .gutter {
   flex: 0 0 5px;
   background: var(--border);
