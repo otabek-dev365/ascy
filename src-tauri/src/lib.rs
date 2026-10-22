@@ -40,6 +40,13 @@ impl PtySession {
     fn kill(&self) {
         self.flow.lock().unwrap().closed = true;
         self.flow_cv.notify_one();
+        // Hang up the program in the foreground (vim, ssh, …) as a real terminal
+        // hangup would — the shell alone doesn't always pass SIGHUP on
+        let group = self.master.lock().unwrap().process_group_leader();
+        if let Some(group) = group.filter(|&g| Some(g as u32) != self.pid) {
+            // SAFETY: plain signal send to a process group id read from the pty
+            unsafe { libc::killpg(group, libc::SIGHUP) };
+        }
         let _ = self.child.lock().unwrap().kill();
     }
 }
