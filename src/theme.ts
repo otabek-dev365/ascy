@@ -81,9 +81,74 @@ const hacker: AppTheme = {
   },
 };
 
-// "mocha" — alias for old settings files (replaced by night)
-export const themes: Record<string, AppTheme> = { night, hacker, mocha: night };
+const BUILT_IN: Record<string, AppTheme> = { hacker, night };
 
-export function getTheme(name: string): AppTheme {
-  return themes[name] ?? hacker;
+/** A user theme from settings.json: xterm colors on top of a built-in theme */
+export interface ThemeSpec extends ITheme {
+  /** Built-in theme to start from (default: the one with the same name, else night) */
+  base?: string;
+  /** Active tab, focused pane border and sliders */
+  accent?: string;
+}
+
+/** Mixes two #rgb/#rrggbb colors; null if either can't be parsed */
+function mix(a: string, b: string, t: number): string | null {
+  const rgb = (c: string) => {
+    const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(c.trim());
+    if (!m) return null;
+    const hex = m[1].length === 3 ? [...m[1]].map((ch) => ch + ch).join("") : m[1];
+    return [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  };
+  const x = rgb(a);
+  const y = rgb(b);
+  if (!x || !y) return null;
+  return "#" + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, "0")).join("");
+}
+
+function buildTheme(name: string, spec: ThemeSpec): AppTheme {
+  const { base: baseName, accent, background, ...colors } = spec;
+  const base = BUILT_IN[baseName ?? name] ?? night;
+  const bg = background ?? base.bgOpaque;
+  const fg = colors.foreground ?? base.css["--fg"];
+  // UI colors follow the new background/foreground; untouched ones stay as in the base
+  const recolored = background !== undefined || colors.foreground !== undefined;
+  const derive = (key: string, value: string | null) =>
+    (recolored && value) || base.css[key];
+  return {
+    xterm: { ...base.xterm, ...colors },
+    bgOpaque: bg,
+    bgTransparent: /^#[0-9a-f]{6}$/i.test(bg) ? `${bg}b0` : bg,
+    css: {
+      "--bg": bg,
+      "--fg": fg,
+      "--accent": accent ?? base.css["--accent"],
+      "--border": derive("--border", mix(bg, fg, 0.15)),
+      "--tab-bg": derive("--tab-bg", mix(bg, "#000000", 0.3)),
+      "--tab-active": derive("--tab-active", mix(bg, fg, 0.12)),
+    },
+  };
+}
+
+export interface ThemeRegistry {
+  themes: Record<string, AppTheme>;
+  /** Problems in the user's themes, worth showing */
+  errors: string[];
+}
+
+/** The built-in themes plus the user's "themes" from settings.json */
+export function resolveThemes(user: unknown): ThemeRegistry {
+  const themes: Record<string, AppTheme> = { ...BUILT_IN };
+  const errors: string[] = [];
+  if (user && typeof user === "object") {
+    for (const [name, spec] of Object.entries(user)) {
+      if (spec && typeof spec === "object") themes[name] = buildTheme(name, spec as ThemeSpec);
+      else errors.push(`theme "${name}" must be an object of colors`);
+    }
+  }
+  return { themes, errors };
+}
+
+/** "mocha" — alias for old settings files (replaced by night) */
+export function themeByName(registry: ThemeRegistry, name: string): AppTheme | undefined {
+  return registry.themes[name === "mocha" && !registry.themes.mocha ? "night" : name];
 }

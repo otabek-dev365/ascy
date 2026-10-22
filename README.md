@@ -40,24 +40,43 @@ Or build it yourself — see [Building](#building).
 
 ## Keyboard shortcuts
 
-| Keys | Action |
-|---|---|
-| `Ctrl+Shift+T` / `W` | New tab / close pane |
-| `Ctrl+PgUp` / `PgDn` | Previous / next tab |
-| `Alt+1..9` | Jump to tab N |
-| `Ctrl+Shift+E` / `O` | Split side by side / stacked |
-| `Alt+←→↑↓` | Move between panes |
-| `Ctrl+Shift+C` / `V` | Copy / paste |
-| `Ctrl+Shift+F` | Search (Enter — next, Shift+Enter — previous, Esc — close) |
-| `Ctrl` + `+` / `-` / `0` | Font bigger / smaller / reset |
-| `Ctrl+Shift+M` | Toggle matrix rain |
-| `Ctrl+Shift+P` | Switch theme (hacker ⇄ night) |
-| `Ctrl+,` | Open the settings file in your default text editor |
-| `Ctrl+Shift+R` | Reload settings |
+| Keys | Action | Name in settings |
+|---|---|---|
+| `Ctrl+Shift+T` | New tab | `new-tab` |
+| `Ctrl+Shift+W` | Close pane | `close-pane` |
+| `Ctrl+PgDn` / `PgUp` | Next / previous tab | `next-tab` / `prev-tab` |
+| `Alt+1..9` | Jump to tab N | `go-to-tab-1` … `go-to-tab-9` |
+| `Ctrl+Shift+E` / `O` | Split side by side / stacked | `split-right` / `split-down` |
+| `Alt+←→↑↓` | Move between panes | `focus-left` / `-right` / `-up` / `-down` |
+| `Ctrl+Shift+C` / `V` | Copy / paste | `copy` / `paste` |
+| `Ctrl+Shift+F` | Search (Enter — next, Shift+Enter — previous, Esc — close) | `search` |
+| `Ctrl` + `=` / `-` / `0` | Font bigger / smaller / reset | `zoom-in` / `zoom-out` / `zoom-reset` |
+| `Ctrl+Shift+M` | Toggle matrix rain | `toggle-matrix` |
+| `Ctrl+Shift+P` | Next theme | `next-theme` |
+| `Ctrl+,` | Open the settings file in your default text editor | `open-settings` |
+| `Ctrl+Shift+R` | Reload settings | `reload-settings` |
+
+Bindings follow the physical key, so they work the same with any keyboard
+layout. To change them, add `keybindings` to the settings file — your
+entries go on top of the defaults, and `null` removes one:
+
+```json
+"keybindings": {
+  "ctrl+t": "new-tab",
+  "ctrl+shift+t": null,
+  "alt+1": null
+}
+```
+
+Keys are written as modifiers (`ctrl`, `alt`, `shift`, `super`) plus one
+key: a letter, a digit, `f1`…`f12`, `left`/`right`/`up`/`down`,
+`pageup`/`pagedown`, `home`/`end`, `enter`, `tab`, `space`, `escape`,
+`comma`, `period`, `minus`, `equal`, `slash`, `numpadadd`, ….
 
 ## Settings
 
-`~/.config/uz.otabek.ascy/settings.json` (created on first run):
+`~/.config/uz.otabek.ascy/settings.json` (created on first run, applied with
+`Ctrl+Shift+R`):
 
 ```json
 {
@@ -66,7 +85,9 @@ Or build it yourself — see [Building](#building).
   "theme": "hacker",
   "matrix": true,
   "shade": 0.28,
-  "scrollback": 10000
+  "scrollback": 10000,
+  "keybindings": {},
+  "themes": {}
 }
 ```
 
@@ -74,10 +95,35 @@ Or build it yourself — see [Building](#building).
 |---|---|
 | `fontFamily` | CSS font list |
 | `fontSize` | Font size in px (8–28) |
-| `theme` | `"hacker"` or `"night"` |
+| `theme` | `"hacker"`, `"night"` or one of your `themes` |
 | `matrix` | Matrix rain background on/off |
 | `shade` | How much the rain is dimmed: `0` (none) … `0.9` (almost black) |
 | `scrollback` | Number of history lines kept per pane |
+| `keybindings` | Your key bindings, see [Keyboard shortcuts](#keyboard-shortcuts) |
+| `themes` | Your own themes, see below |
+
+### Themes
+
+A theme starts from a built-in one (`base`, default `night`) and replaces the
+colors you list — any [xterm.js theme color](https://xtermjs.org/docs/api/terminal/interfaces/itheme/)
+plus `accent` for the active tab, focused pane and sliders. The tab bar and
+borders are derived from `background` and `foreground`.
+
+```json
+"theme": "ocean",
+"themes": {
+  "ocean": {
+    "base": "night",
+    "background": "#0b1622",
+    "foreground": "#d8e4f0",
+    "cursor": "#5fd7ff",
+    "accent": "#5fd7ff",
+    "blue": "#4fa3ff"
+  }
+}
+```
+
+Your themes also appear in the ☰ menu and in the `Ctrl+Shift+P` rotation.
 
 ## Building
 

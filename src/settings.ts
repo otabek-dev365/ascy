@@ -1,13 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { ThemeSpec } from "./theme";
 
 export interface Settings {
   fontFamily: string;
   fontSize: number;
-  theme: "night" | "hacker";
+  /** "hacker", "night" or the name of a theme in `themes` */
+  theme: string;
   matrix: boolean;
   /** How much the matrix rain is dimmed: 0 (no shade) .. 0.9 (almost black) */
   shade: number;
   scrollback: number;
+  /** Key combo → action, on top of the defaults; null removes a binding */
+  keybindings: Record<string, string | null>;
+  /** User themes: name → xterm colors (see ThemeSpec) */
+  themes: Record<string, ThemeSpec>;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -18,6 +24,8 @@ export const DEFAULT_SETTINGS: Settings = {
   matrix: true,
   shade: 0.28,
   scrollback: 10000,
+  keybindings: {},
+  themes: {},
 };
 
 export interface LoadResult {

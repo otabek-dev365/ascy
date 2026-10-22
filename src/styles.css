@@ -194,6 +194,8 @@ body.matrix .xterm-rows {
 
 .segmented {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;

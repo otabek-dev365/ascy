@@ -12,7 +12,8 @@ import { SearchAddon } from "@xterm/addon-search";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import "@xterm/xterm/css/xterm.css";
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from "./settings";
-import { getTheme } from "./theme";
+import { resolveThemes, themeByName, type AppTheme, type ThemeRegistry } from "./theme";
+import { buildKeymap, matchKey, type Action } from "./keys";
 import { MatrixRain } from "./matrix";
 
 interface Pane {
@@ -40,6 +41,9 @@ const panes = new Map<string, Pane>();
 let activeTabId: string | null = null;
 let settings: Settings;
 let matrix: MatrixRain;
+// Derived from settings by deriveFromSettings()
+let keymap = buildKeymap(undefined).bindings;
+let themeRegistry: ThemeRegistry = resolveThemes(undefined);
 
 // Unique IDs so a page reload (dev HMR) never collides with an old session
 const newId = () => `t-${crypto.randomUUID().slice(0, 8)}`;
@@ -72,8 +76,12 @@ function panesOfTab(tabId: string): Pane[] {
   return [...panes.values()].filter((p) => p.tabId === tabId);
 }
 
+function currentTheme(): AppTheme {
+  return themeByName(themeRegistry, settings.theme) ?? themeRegistry.themes.hacker;
+}
+
 function currentXtermTheme() {
-  const t = getTheme(settings.theme);
+  const t = currentTheme();
   return {
     ...t.xterm,
     background: settings.matrix ? t.bgTransparent : t.bgOpaque,
@@ -81,7 +89,7 @@ function currentXtermTheme() {
 }
 
 function applyCssTheme() {
-  const t = getTheme(settings.theme);
+  const t = currentTheme();
   for (const [k, v] of Object.entries(t.css)) {
     document.documentElement.style.setProperty(k, v);
   }
@@ -89,60 +97,37 @@ function applyCssTheme() {
 
 // ---------- Keyboard shortcuts ----------
 
-type Action =
-  | "newtab" | "closepane" | "next" | "prev"
-  | "split-side" | "split-down"
-  | "copy" | "paste"
-  | "zoomin" | "zoomout" | "zoomreset"
-  | "matrix" | "theme" | "settings" | "reload" | "search"
-  | `goto:${number}`
-  | `nav:${string}`;
-
 function matchShortcut(e: KeyboardEvent): Action | null {
-  if (e.type !== "keydown") return null;
-  const { ctrlKey: ctrl, shiftKey: shift, altKey: alt, code } = e;
-  if (ctrl && shift && code === "KeyT") return "newtab";
-  if (ctrl && shift && code === "KeyW") return "closepane";
-  if (ctrl && shift && code === "KeyE") return "split-side";
-  if (ctrl && shift && code === "KeyF") return "search";
-  if (ctrl && shift && code === "KeyO") return "split-down";
-  if (ctrl && shift && code === "KeyC") return "copy";
-  if (ctrl && shift && code === "KeyV") return "paste";
-  if (ctrl && shift && code === "KeyM") return "matrix";
-  if (ctrl && shift && code === "KeyP") return "theme";
-  if (ctrl && shift && code === "KeyR") return "reload";
-  if (ctrl && !shift && code === "Comma") return "settings";
-  if (ctrl && !shift && code === "PageDown") return "next";
-  if (ctrl && !shift && code === "PageUp") return "prev";
-  if (ctrl && (code === "Equal" || code === "NumpadAdd")) return "zoomin";
-  if (ctrl && (code === "Minus" || code === "NumpadSubtract")) return "zoomout";
-  if (ctrl && !shift && code === "Digit0") return "zoomreset";
-  if (alt && /^Digit[1-9]$/.test(code)) return `goto:${Number(code.slice(5))}`;
-  if (alt && /^Arrow(Left|Right|Up|Down)$/.test(code)) return `nav:${code}`;
-  return null;
+  return matchKey(keymap, e);
 }
 
 function runShortcut(action: Action) {
   switch (action) {
-    case "newtab":
+    case "new-tab":
       newTab();
       break;
-    case "closepane": {
+    case "close-pane": {
       const pane = activePane();
       if (pane) closePane(pane.id);
       break;
     }
-    case "split-side":
+    case "split-right":
       split("row");
       break;
     case "split-down":
       split("col");
       break;
-    case "next":
+    case "next-tab":
       cycle(1);
       break;
-    case "prev":
+    case "prev-tab":
       cycle(-1);
+      break;
+    case "focus-left":
+    case "focus-right":
+    case "focus-up":
+    case "focus-down":
+      navigate(action);
       break;
     case "copy": {
       const sel = activePane()?.term.getSelection();
@@ -160,42 +145,41 @@ function runShortcut(action: Action) {
       }
       break;
     }
-    case "zoomin":
+    case "zoom-in":
       zoom(1);
       break;
-    case "zoomout":
+    case "zoom-out":
       zoom(-1);
       break;
-    case "zoomreset":
+    case "zoom-reset":
       zoom(0);
       break;
-    case "matrix":
+    case "toggle-matrix":
       settings.matrix = !settings.matrix;
       applyMatrix();
       applySettingsToTerms();
       saveSettings(settings);
       break;
-    case "theme":
-      settings.theme = settings.theme === "hacker" ? "night" : "hacker";
+    case "next-theme": {
+      const names = Object.keys(themeRegistry.themes);
+      settings.theme = names[(names.indexOf(settings.theme) + 1) % names.length];
       applySettingsToTerms();
       saveSettings(settings);
       break;
-    case "settings":
+    }
+    case "open-settings":
       invoke("settings_open");
       break;
     case "search":
       openSearch();
       break;
-    case "reload":
+    case "reload-settings":
       reloadSettings();
       break;
-    default:
-      if (action.startsWith("goto:")) {
-        const id = [...tabs.keys()][Number(action.slice(5)) - 1];
-        if (id) activateTab(id);
-      } else if (action.startsWith("nav:")) {
-        navigate(action.slice(4));
-      }
+    default: {
+      const id = [...tabs.keys()][Number(action.slice("go-to-tab-".length)) - 1];
+      if (id) activateTab(id);
+    }
   }
 }
 
@@ -483,7 +467,7 @@ function setActivePane(paneId: string) {
 }
 
 /** Alt+arrow — move to the geometrically nearest pane in that direction */
-function navigate(arrowCode: string) {
+function navigate(dir: "focus-left" | "focus-right" | "focus-up" | "focus-down") {
   const cur = activePane();
   if (!cur || !activeTabId) return;
   const r = cur.el.getBoundingClientRect();
@@ -497,9 +481,9 @@ function navigate(arrowCode: string) {
     const dx = pr.x + pr.width / 2 - cx;
     const dy = pr.y + pr.height / 2 - cy;
     const towards =
-      arrowCode === "ArrowLeft" ? dx < -1
-      : arrowCode === "ArrowRight" ? dx > 1
-      : arrowCode === "ArrowUp" ? dy < -1
+      dir === "focus-left" ? dx < -1
+      : dir === "focus-right" ? dx > 1
+      : dir === "focus-up" ? dy < -1
       : dy > 1;
     if (!towards) continue;
     const dist = dx * dx + dy * dy;
@@ -602,11 +586,19 @@ function paintRange(el: HTMLInputElement) {
 
 /** Fills the controls with the current settings when the panel opens */
 function syncMenu() {
-  for (const b of document.querySelectorAll<HTMLButtonElement>("#m-theme button")) {
-    const on = b.dataset.theme === settings.theme;
-    b.classList.toggle("active", on);
-    b.setAttribute("aria-checked", String(on));
-  }
+  const themeEl = document.getElementById("m-theme")!;
+  themeEl.replaceChildren(
+    ...Object.keys(themeRegistry.themes).map((name) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("role", "radio");
+      b.dataset.theme = name;
+      b.textContent = name;
+      b.classList.toggle("active", name === settings.theme);
+      b.setAttribute("aria-checked", String(name === settings.theme));
+      return b;
+    }),
+  );
   (document.getElementById("m-matrix") as HTMLInputElement).checked = settings.matrix;
   const shade = Math.round(Math.min(0.9, Math.max(0, settings.shade)) * 100);
   const shadeInput = document.getElementById("m-shade") as HTMLInputElement;
@@ -726,11 +718,24 @@ function applySettingsToTerms() {
   }
 }
 
+/** Rebuilds the key bindings and the theme list; returns problems to report */
+function deriveFromSettings(): string[] {
+  const keys = buildKeymap(settings.keybindings);
+  keymap = keys.bindings;
+  themeRegistry = resolveThemes(settings.themes);
+  const errors = [...keys.errors, ...themeRegistry.errors];
+  if (!themeByName(themeRegistry, settings.theme)) {
+    errors.push(`theme "${settings.theme}" not found — using hacker`);
+  }
+  return errors.map((e) => `settings.json: ${e}`);
+}
+
 async function reloadSettings() {
   const { settings: loaded, error } = await loadSettings();
   // A broken file keeps the current settings instead of resetting everything
   if (loaded) settings = loaded;
-  showToast(error ?? "Settings reloaded", !!error);
+  const problems = [...(error ? [error] : []), ...deriveFromSettings()];
+  showToast(problems.length ? problems.join("\n") : "Settings reloaded", problems.length > 0);
   applyMatrix();
   applySettingsToTerms();
 }
@@ -756,10 +761,11 @@ async function main() {
   await invoke("pty_kill_all").catch(() => {});
   const { settings: loaded, error } = await loadSettings();
   settings = loaded ?? { ...DEFAULT_SETTINGS };
+  const problems = [...(error ? [error] : []), ...deriveFromSettings()];
   matrix = new MatrixRain(document.getElementById("matrix") as HTMLCanvasElement);
   applyCssTheme();
   applyMatrix();
-  if (error) showToast(error, true);
+  if (problems.length) showToast(problems.join("\n"), true);
   const toast = document.getElementById("toast")!;
   toast.addEventListener("click", () => (toast.hidden = true));
 
