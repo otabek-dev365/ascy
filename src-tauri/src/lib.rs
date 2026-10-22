@@ -67,6 +67,19 @@ fn has_more_output(fd: RawFd) -> bool {
     unsafe { libc::poll(&mut pfd, 1, 0) == 1 && pfd.revents & libc::POLLIN != 0 }
 }
 
+/// UTF-8 aware line editing: in cooked mode (`read`, `cat`) Backspace erases a
+/// whole multi-byte character instead of just its last byte
+fn enable_iutf8(fd: RawFd) {
+    // SAFETY: termios is plain data, filled in by tcgetattr on a valid pty fd
+    unsafe {
+        let mut t: libc::termios = std::mem::zeroed();
+        if libc::tcgetattr(fd, &mut t) == 0 {
+            t.c_iflag |= libc::IUTF8;
+            libc::tcsetattr(fd, libc::TCSANOW, &t);
+        }
+    }
+}
+
 #[tauri::command]
 fn pty_spawn(
     app: AppHandle,
@@ -92,12 +105,16 @@ fn pty_spawn(
         cmd.cwd(dir);
     }
 
+    let fd = pair.master.as_raw_fd();
+    if let Some(fd) = fd {
+        enable_iutf8(fd);
+    }
+
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     drop(pair.slave);
 
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
     let mut writer = pair.master.take_writer().map_err(|e| e.to_string())?;
-    let fd = pair.master.as_raw_fd();
 
     let (input, input_rx) = std::sync::mpsc::channel::<Vec<u8>>();
     std::thread::spawn(move || {
@@ -268,6 +285,18 @@ fn settings_save(app: AppHandle, settings: serde_json::Value) -> Result<(), Stri
 fn settings_open(app: AppHandle) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
     let path = settings_file(&app)?;
+    // `.json` usually belongs to the web browser (and a snap Firefox can't even
+    // read ~/.config), so prefer the default text editor
+    #[cfg(target_os = "linux")]
+    {
+        use gio::prelude::*;
+        if let Some(editor) = gio::AppInfo::default_for_type("text/plain", false) {
+            let file = gio::File::for_path(&path);
+            if editor.launch(&[file], None::<&gio::AppLaunchContext>).is_ok() {
+                return Ok(());
+            }
+        }
+    }
     app.opener()
         .open_path(path.to_string_lossy(), None::<&str>)
         .map_err(|e| e.to_string())

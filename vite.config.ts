@@ -10,6 +10,12 @@ export default defineConfig(async () => ({
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
+  // The app only runs in a modern WebKitGTK. Vite's default (older browser)
+  // targets make esbuild miscompile xterm.js's DECRQM handler — it throws, the
+  // parser stops, and TUIs that query terminal modes (e.g. opencode) hang.
+  build: {
+    target: "es2022",
+  },
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,

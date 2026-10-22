@@ -33,7 +33,7 @@ black background, phosphor-green text and an optional Matrix rain behind it.
 | `Ctrl` + `+` / `-` / `0` | Font bigger / smaller / reset |
 | `Ctrl+Shift+M` | Toggle matrix rain |
 | `Ctrl+Shift+P` | Switch theme (hacker ⇄ night) |
-| `Ctrl+,` | Open the settings file |
+| `Ctrl+,` | Open the settings file in your default text editor |
 | `Ctrl+Shift+R` | Reload settings |
 
 ## Settings

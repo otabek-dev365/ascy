@@ -184,26 +184,101 @@ body.matrix .xterm-rows {
   opacity: 0.85;
 }
 
-#menu label {
+#menu label,
+.menu-row > span {
   opacity: 0.85;
 }
 
-#menu input[type="range"] {
-  width: 100%;
-  accent-color: var(--accent);
-}
+/* WebKitGTK draws native GTK widgets that ignore the theme (a bright select
+   box, an almost invisible checkbox), so every menu control is drawn in CSS */
 
-#menu input[type="checkbox"] {
-  accent-color: var(--accent);
-}
-
-#menu select {
-  background: var(--tab-active);
-  color: var(--fg);
+.segmented {
+  display: flex;
   border: 1px solid var(--border);
   border-radius: 4px;
+  overflow: hidden;
+}
+
+.segmented button {
+  background: none;
+  border: none;
+  color: var(--fg);
+  opacity: 0.55;
   font: 12px monospace;
-  padding: 2px 4px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.segmented button + button {
+  border-left: 1px solid var(--border);
+}
+
+.segmented button:hover {
+  opacity: 1;
+}
+
+.segmented button.active {
+  background: var(--tab-active);
+  color: var(--accent);
+  opacity: 1;
+}
+
+#menu input.switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 30px;
+  height: 16px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--tab-active);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+#menu input.switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--fg);
+  opacity: 0.45;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+#menu input.switch:checked {
+  border-color: var(--accent);
+}
+
+#menu input.switch:checked::before {
+  transform: translateX(14px);
+  background: var(--accent);
+  opacity: 1;
+}
+
+/* --fill is set from JS: WebKit can't style the track left of the thumb */
+#menu input[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  margin: 6px 0;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--accent) var(--fill, 0%), var(--border) var(--fill, 0%));
+  cursor: pointer;
+}
+
+#menu input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--tab-bg);
 }
 
 .menu-actions {

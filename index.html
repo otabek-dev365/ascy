@@ -18,15 +18,15 @@
     </div>
     <div id="menu" hidden>
       <div class="menu-row">
-        <label for="m-theme">Theme</label>
-        <select id="m-theme">
-          <option value="hacker">hacker</option>
-          <option value="night">night</option>
-        </select>
+        <span>Theme</span>
+        <div id="m-theme" class="segmented" role="radiogroup" aria-label="Theme">
+          <button type="button" role="radio" data-theme="hacker">hacker</button>
+          <button type="button" role="radio" data-theme="night">night</button>
+        </div>
       </div>
       <div class="menu-row">
         <label for="m-matrix">Matrix rain</label>
-        <input id="m-matrix" type="checkbox" />
+        <input id="m-matrix" class="switch" type="checkbox" role="switch" />
       </div>
       <div class="menu-group">
         <div class="menu-label">

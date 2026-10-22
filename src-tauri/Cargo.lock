@@ -72,6 +72,7 @@ dependencies = [
 name = "ascy"
 version = "0.1.0"
 dependencies = [
+ "gio",
  "libc",
  "portable-pty",
  "serde",

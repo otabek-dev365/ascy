@@ -593,14 +593,29 @@ function initSearchBar() {
 
 const menuEl = () => document.getElementById("menu")!;
 
+/** Colors the slider track up to the thumb (see --fill in styles.css) */
+function paintRange(el: HTMLInputElement) {
+  const min = Number(el.min);
+  const pct = ((Number(el.value) - min) / (Number(el.max) - min)) * 100;
+  el.style.setProperty("--fill", `${pct}%`);
+}
+
 /** Fills the controls with the current settings when the panel opens */
 function syncMenu() {
-  (document.getElementById("m-theme") as HTMLSelectElement).value = settings.theme;
+  for (const b of document.querySelectorAll<HTMLButtonElement>("#m-theme button")) {
+    const on = b.dataset.theme === settings.theme;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-checked", String(on));
+  }
   (document.getElementById("m-matrix") as HTMLInputElement).checked = settings.matrix;
   const shade = Math.round(Math.min(0.9, Math.max(0, settings.shade)) * 100);
-  (document.getElementById("m-shade") as HTMLInputElement).value = String(shade);
+  const shadeInput = document.getElementById("m-shade") as HTMLInputElement;
+  shadeInput.value = String(shade);
+  paintRange(shadeInput);
   document.getElementById("m-shade-val")!.textContent = `${shade}%`;
-  (document.getElementById("m-font") as HTMLInputElement).value = String(settings.fontSize);
+  const fontInput = document.getElementById("m-font") as HTMLInputElement;
+  fontInput.value = String(settings.fontSize);
+  paintRange(fontInput);
   document.getElementById("m-font-val")!.textContent = `${settings.fontSize}px`;
 }
 
@@ -628,8 +643,11 @@ function initMenu() {
     if (e.code === "Escape" && !el.hidden) toggleMenu(false);
   });
 
-  (document.getElementById("m-theme") as HTMLSelectElement).addEventListener("change", (e) => {
-    settings.theme = (e.target as HTMLSelectElement).value as Settings["theme"];
+  document.getElementById("m-theme")!.addEventListener("click", (e) => {
+    const theme = (e.target as HTMLElement).closest("button")?.dataset.theme;
+    if (!theme) return;
+    settings.theme = theme as Settings["theme"];
+    syncMenu();
     applySettingsToTerms();
     saveSettings(settings);
   });
@@ -644,6 +662,7 @@ function initMenu() {
   const shadeInput = document.getElementById("m-shade") as HTMLInputElement;
   shadeInput.addEventListener("input", () => {
     settings.shade = Number(shadeInput.value) / 100;
+    paintRange(shadeInput);
     document.getElementById("m-shade-val")!.textContent = `${shadeInput.value}%`;
     applyMatrix();
   });
@@ -652,6 +671,7 @@ function initMenu() {
   const fontInput = document.getElementById("m-font") as HTMLInputElement;
   fontInput.addEventListener("input", () => {
     settings.fontSize = Number(fontInput.value);
+    paintRange(fontInput);
     document.getElementById("m-font-val")!.textContent = `${fontInput.value}px`;
     applySettingsToTerms();
   });
