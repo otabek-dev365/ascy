@@ -4,6 +4,7 @@ const BASE_ACTIONS = [
   "close-pane",
   "next-tab",
   "prev-tab",
+  "rename-tab",
   "split-right",
   "split-down",
   "focus-left",

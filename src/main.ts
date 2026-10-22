@@ -34,6 +34,8 @@ interface Tab {
   btn: HTMLElement;
   titleEl: HTMLElement;
   activePaneId: string | null;
+  /** Set by renaming the tab; otherwise the tab shows its active pane's title */
+  customTitle: string | null;
 }
 
 const tabs = new Map<string, Tab>();
@@ -126,6 +128,9 @@ function runShortcut(action: Action) {
     case "prev-tab":
       cycle(-1);
       break;
+    case "rename-tab":
+      if (activeTabId) renameTab(activeTabId);
+      break;
     case "focus-left":
     case "focus-right":
     case "focus-up":
@@ -180,7 +185,7 @@ function runShortcut(action: Action) {
       reloadSettings();
       break;
     default: {
-      const id = [...tabs.keys()][Number(action.slice("go-to-tab-".length)) - 1];
+      const id = tabOrder()[Number(action.slice("go-to-tab-".length)) - 1];
       if (id) activateTab(id);
     }
   }
@@ -279,10 +284,7 @@ async function bootPane(tabId: string, el: HTMLElement, cwd: string | null) {
   term.onTitleChange((t) => {
     pane.title = t || "shell";
     const tab = tabs.get(tabId);
-    if (tab?.activePaneId === id) {
-      tab.titleEl.textContent = pane.title;
-      if (activeTabId === tabId) syncWindowTitle();
-    }
+    if (tab?.activePaneId === id) refreshTitle(tab);
   });
   term.attachCustomKeyEventHandler((e) => !matchShortcut(e));
   el.addEventListener("focusin", () => setActivePane(id));
@@ -314,6 +316,7 @@ async function newTab() {
 
   const btn = document.createElement("div");
   btn.className = "tab";
+  btn.dataset.tabId = tabId;
   const titleEl = document.createElement("span");
   titleEl.textContent = "shell";
   const closeEl = document.createElement("button");
@@ -325,9 +328,11 @@ async function newTab() {
   });
   btn.append(titleEl, closeEl);
   btn.addEventListener("click", () => activateTab(tabId));
+  titleEl.addEventListener("dblclick", () => renameTab(tabId));
+  makeTabDraggable(btn);
   tabsEl().appendChild(btn);
 
-  tabs.set(tabId, { id: tabId, rootEl, btn, titleEl, activePaneId: null });
+  tabs.set(tabId, { id: tabId, rootEl, btn, titleEl, activePaneId: null, customTitle: null });
   activateTab(tabId);
 
   const el = makePaneEl(newId());
@@ -459,7 +464,7 @@ function removeTab(tab: Tab) {
     return;
   }
   if (activeTabId === tab.id) {
-    const ids = [...tabs.keys()];
+    const ids = tabOrder();
     activateTab(ids[ids.length - 1]);
   }
 }
@@ -488,8 +493,7 @@ function setActivePane(paneId: string) {
   for (const p of panesOfTab(pane.tabId)) {
     p.el.classList.toggle("focused", p.id === paneId);
   }
-  tab.titleEl.textContent = pane.title;
-  if (activeTabId === pane.tabId) syncWindowTitle();
+  refreshTitle(tab);
 }
 
 /** Alt+arrow — move to the geometrically nearest pane in that direction */
@@ -525,14 +529,92 @@ function navigate(dir: "focus-left" | "focus-right" | "focus-up" | "focus-down")
 }
 
 function cycle(dir: number) {
-  const ids = [...tabs.keys()];
+  const ids = tabOrder();
   if (!activeTabId || ids.length < 2) return;
   const i = ids.indexOf(activeTabId);
   activateTab(ids[(i + dir + ids.length) % ids.length]);
 }
 
 function syncWindowTitle() {
-  getCurrentWindow().setTitle(activePane()?.title || "Ascy");
+  const tab = activeTab();
+  getCurrentWindow().setTitle(tab ? tabTitle(tab) : "Ascy");
+}
+
+// ---------- Tab titles and order ----------
+
+/** Tab ids in the order shown in the tab bar (tabs can be dragged around) */
+function tabOrder(): string[] {
+  return [...tabsEl().children].map((b) => (b as HTMLElement).dataset.tabId!);
+}
+
+function tabTitle(tab: Tab): string {
+  const pane = tab.activePaneId ? panes.get(tab.activePaneId) : undefined;
+  return tab.customTitle ?? pane?.title ?? "shell";
+}
+
+function refreshTitle(tab: Tab) {
+  tab.titleEl.textContent = tabTitle(tab);
+  if (activeTabId === tab.id) syncWindowTitle();
+}
+
+/** Edits the tab's name in place: Enter saves, Esc cancels, empty = automatic again */
+function renameTab(tabId: string) {
+  const tab = tabs.get(tabId);
+  if (!tab || !tab.titleEl.isConnected) return;
+  const input = document.createElement("input");
+  input.className = "tab-rename";
+  input.value = tabTitle(tab);
+  input.spellcheck = false;
+  tab.titleEl.replaceWith(input);
+  input.select();
+  let finished = false;
+  const finish = (save: boolean) => {
+    if (finished) return;
+    finished = true;
+    if (save) tab.customTitle = input.value.trim() || null;
+    input.replaceWith(tab.titleEl);
+    refreshTitle(tab);
+    activePane()?.term.focus();
+  };
+  input.addEventListener("keydown", (e) => {
+    // Typing must not reach the global shortcuts
+    e.stopPropagation();
+    if (e.code === "Enter") finish(true);
+    else if (e.code === "Escape") finish(false);
+  });
+  input.addEventListener("blur", () => finish(true));
+}
+
+/** Dragging a tab sideways moves it; a press without movement stays a click */
+function makeTabDraggable(btn: HTMLElement) {
+  btn.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || (e.target as HTMLElement).closest("button, input")) return;
+    const startX = e.clientX;
+    let dragging = false;
+    const move = (ev: PointerEvent) => {
+      if (!dragging && Math.abs(ev.clientX - startX) < 5) return;
+      dragging = true;
+      btn.classList.add("dragging");
+      // Put the tab before the first other tab whose middle is right of the pointer
+      const others = [...tabsEl().children].filter((c) => c !== btn);
+      const before = others.find((c) => {
+        const r = c.getBoundingClientRect();
+        return ev.clientX < r.left + r.width / 2;
+      });
+      if (before) {
+        if (btn.nextElementSibling !== before) tabsEl().insertBefore(btn, before);
+      } else if (tabsEl().lastElementChild !== btn) {
+        tabsEl().appendChild(btn);
+      }
+    };
+    const up = () => {
+      btn.classList.remove("dragging");
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  });
 }
 
 // ---------- Search (Ctrl+Shift+F) ----------

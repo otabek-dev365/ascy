@@ -27,7 +27,8 @@ Or build it yourself — see [Building](#building).
 
 ## Features
 
-- Tabs and split panes (nested, resizable with the mouse)
+- Tabs and split panes (nested, resizable with the mouse); double-click a tab
+  to rename it, drag it to reorder
 - Two themes: `hacker` and `night` (Tokyo Night style)
 - Matrix rain background with an adjustable shade
 - New tabs and panes open in the active shell's directory
@@ -47,6 +48,7 @@ Or build it yourself — see [Building](#building).
 | `Ctrl+Shift+W` | Close pane | `close-pane` |
 | `Ctrl+PgDn` / `PgUp` | Next / previous tab | `next-tab` / `prev-tab` |
 | `Alt+1..9` | Jump to tab N | `go-to-tab-1` … `go-to-tab-9` |
+| — (double-click the tab) | Rename tab | `rename-tab` |
 | `Ctrl+Shift+E` / `O` | Split side by side / stacked | `split-right` / `split-down` |
 | `Alt+←→↑↓` | Move between panes | `focus-left` / `-right` / `-up` / `-down` |
 | `Ctrl+Shift+C` / `V` | Copy / paste | `copy` / `paste` |

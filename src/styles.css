@@ -93,6 +93,24 @@ body.matrix .xterm-rows {
   white-space: nowrap;
 }
 
+.tab.dragging {
+  opacity: 1;
+  background: var(--tab-active);
+  cursor: grabbing;
+}
+
+/* Inline editor shown when a tab is renamed (double-click) */
+.tab-rename {
+  width: 130px;
+  background: transparent;
+  color: var(--fg);
+  border: none;
+  border-bottom: 1px solid var(--accent);
+  outline: none;
+  font: 12px monospace;
+  user-select: text;
+}
+
 .tab button {
   background: none;
   border: none;
