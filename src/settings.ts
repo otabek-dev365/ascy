@@ -14,6 +14,8 @@ export interface Settings {
   confirmClose: boolean;
   /** Reopen the last run's tabs (directories and names) on start */
   restoreSession: boolean;
+  /** Volume of arcade games: 0 (off) .. 1 */
+  gameVolume: number;
   /** Key combo → action, on top of the defaults; null removes a binding */
   keybindings: Record<string, string | null>;
   /** User themes: name → xterm colors (see ThemeSpec) */
@@ -30,6 +32,7 @@ export const DEFAULT_SETTINGS: Settings = {
   scrollback: 10000,
   confirmClose: true,
   restoreSession: true,
+  gameVolume: 0.6,
   keybindings: {},
   themes: {},
 };

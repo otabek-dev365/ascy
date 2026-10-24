@@ -248,9 +248,11 @@ function makeTerminal(el: HTMLElement, kind: Pane["kind"]) {
   term.unicode.activeVersion = "11";
   term.open(el);
 
-  // The WebGL renderer can't draw a transparent background — stay on the DOM renderer while matrix is on
+  // The WebGL renderer can't draw a transparent background — shells stay on
+  // the DOM renderer while matrix is on. Games redraw the whole pane every
+  // frame, which only WebGL keeps up with, so the arcade always uses it.
   let webgl: WebglAddon | null = null;
-  if (!settings.matrix) {
+  if (!settings.matrix || kind === "arcade") {
     try {
       webgl = new WebglAddon();
       term.loadAddon(webgl);
@@ -447,7 +449,7 @@ async function bootArcadePane(tabId: string, el: HTMLElement) {
     leave: leaveArcade,
     accent: () => currentTheme().css["--accent"],
     toast: showToast,
-  });
+  }, settings.gameVolume);
   pane.arcade = arcade;
 
   // Keys go to the game, except the app's own shortcuts
@@ -895,6 +897,11 @@ function syncMenu() {
   fontInput.value = String(settings.fontSize);
   paintRange(fontInput);
   document.getElementById("m-font-val")!.textContent = `${settings.fontSize}px`;
+  const sound = Math.round(Math.min(1, Math.max(0, settings.gameVolume)) * 100);
+  const soundInput = document.getElementById("m-sound") as HTMLInputElement;
+  soundInput.value = String(sound);
+  paintRange(soundInput);
+  document.getElementById("m-sound-val")!.textContent = sound ? `${sound}%` : "off";
 }
 
 function toggleMenu(show?: boolean) {
@@ -955,6 +962,15 @@ function initMenu() {
   });
   fontInput.addEventListener("change", () => saveSettings(settings));
 
+  const soundInput = document.getElementById("m-sound") as HTMLInputElement;
+  soundInput.addEventListener("input", () => {
+    settings.gameVolume = Number(soundInput.value) / 100;
+    paintRange(soundInput);
+    document.getElementById("m-sound-val")!.textContent = Number(soundInput.value) ? `${soundInput.value}%` : "off";
+    for (const p of panes.values()) p.arcade?.setVolume(settings.gameVolume);
+  });
+  soundInput.addEventListener("change", () => saveSettings(settings));
+
   document.getElementById("m-settings")!.addEventListener("click", () => invoke("settings_open"));
   document.getElementById("m-reload")!.addEventListener("click", async () => {
     await reloadSettings();
@@ -985,7 +1001,8 @@ function applySettingsToTerms() {
   applyCssTheme();
   for (const p of panes.values()) {
     // Matrix ⇄ WebGL switch: transparency only works with the DOM renderer
-    if (settings.matrix && p.webgl) {
+    if (p.kind === "arcade") p.arcade?.setVolume(settings.gameVolume);
+    else if (settings.matrix && p.webgl) {
       p.webgl.dispose();
       p.webgl = null;
     } else if (!settings.matrix && !p.webgl) {

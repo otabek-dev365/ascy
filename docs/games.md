@@ -44,7 +44,7 @@ and `.` only.
 
 | Field | Meaning |
 |---|---|
-| `api` | The game API version the game is written for — `1` |
+| `api` | The game API version the game is written for — `1`, or `2` for sound and music |
 | `name`, `author`, `version` | Shown in the game list |
 | `description`, `controls` | Shown under the list when the game is selected |
 | `cover` | Up to 4 lines of up to 20 characters: the picture on the game's card |
@@ -132,6 +132,82 @@ Ascy's own shortcuts (`Ctrl+Shift+…`, `Alt+1`…) don't reach games.
 | `ascy.score(n)` | Report the score of a finished round; Ascy keeps the best one |
 | `ascy.best` | The best score so far, or `null` |
 | `ascy.exit()` | Back to the game list (offer it on `Esc`) |
+
+## Sound and music
+
+A game describes sounds and Ascy synthesizes them — retro chiptune style, no
+audio files. Both calls need game API 2 (`"api": 2` in `game.json`); write
+`ascy.sound?.(…)` if the game should also run on an older Ascy without sound.
+Players set the volume in Ascy's menu ("Game sound"); everything pauses while
+the game is off screen.
+
+### Sound effects
+
+```js
+ascy.sound("pickup");                                   // a preset
+ascy.sound({ wave: "square", freq: [900, 180], time: 0.16 }, { volume: 0.8, pan: -0.5 });
+```
+
+Presets: `blip` `select` `shoot` `laser` `explosion` `hit` `hurt` `pickup`
+`powerup` `jump` `error`. Your own sound is one layer, or an array of up to 8
+layers that play together:
+
+| Field | |
+|---|---|
+| `wave` | `"square"` (default), `"sawtooth"`, `"triangle"`, `"sine"` or `"noise"` |
+| `freq` | Hz, or `[from, to]` to slide. For noise: how fast it changes — 40000 hiss, 6000 crunch, 500 rumble |
+| `time` | Seconds until silent (up to 3) |
+| `attack`, `hold` | Seconds to full volume, then seconds at full volume before it fades out |
+| `volume` | 0–1 |
+| `filter` | Low-pass cutoff in Hz, or `[from, to]` |
+| `vibrato` | `[rate in Hz, depth]`, depth as a fraction of the pitch: `[8, 0.03]` |
+| `delay` | Seconds before this layer starts — for little sequences |
+
+The second argument is optional: `volume` (0–1), `pan` (−1 left … 1 right)
+and `rate` (pitch × — vary it a little so repeated sounds don't tire the ear).
+
+### Music
+
+```js
+ascy.music({
+  bpm: 128,
+  tracks: [
+    { wave: "square", volume: 0.3, vibrato: [6, 0.01], notes: "E4 - G4 - | A4 - - . | B4 . A4 G4 | E4 - - -" },
+    { wave: "triangle", volume: 0.4, notes: "E2 . E2 . E2 . E2 . | C2 . C2 . D2 . D2 ." },
+    { drums: true, volume: 0.5, notes: "k . h . s . h . k k h . s . h h" },
+  ],
+});
+ascy.music(null); // stop
+```
+
+One token per step (by default a sixteenth note: `steps: 4` per beat): a
+note like `C4`, `F#3` or `Bb2`, `.` for a rest, `-` to hold the note longer,
+or a chord `C4+E4+G4`. `|` is only a bar line for your eyes. Drum tracks use
+`k` kick, `s` snare, `h` hat, `o` open hat, `c` crash and `t` tom (`k+h` for
+two at once). Each track repeats on its own length, so a one-bar drum pattern
+loops under a long melody.
+
+| Song field | |
+|---|---|
+| `bpm` | 30–300, default 120 |
+| `steps` | Steps per beat, 1–8, default 4 |
+| `loop` | `false` plays it once — for jingles |
+| `volume` | 0–1, default 0.6 |
+| `tracks` | Up to 8 |
+
+| Track field | |
+|---|---|
+| `notes` | The tokens above |
+| `wave` | As for sounds; `drums: true` makes a drum track |
+| `volume`, `pan` | 0–1, −1…1 |
+| `attack`, `decay`, `sustain`, `release` | The envelope of each note: seconds, seconds, level 0–1, seconds |
+| `filter`, `vibrato`, `detune` | Low-pass Hz, `[rate, depth]`, cents |
+| `arp` | `true` plays chords as a fast arpeggio — the classic chiptune chord |
+| `transpose` | Semitones up or down |
+
+Malformed sounds and songs are ignored. The checker Ascy uses is
+[`src/arcade/sound.ts`](../src/arcade/sound.ts): `toTones(sound)` and
+`toSong(song)` throw an error that says what's wrong.
 
 ## The sandbox
 

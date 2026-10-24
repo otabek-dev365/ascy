@@ -27,8 +27,9 @@ Or build it yourself — see [Building](#building).
 
 ## Features
 
-- **Arcade** (`Ctrl+Shift+G`): ASCII games right in the terminal — Snake is
-  built in, and anyone can [make a game](docs/games.md) for it
+- **Arcade** (`Ctrl+Shift+G`): ASCII games right in the terminal, with
+  chiptune sound and music — Snake is built in, and anyone can
+  [make a game](docs/games.md) for it
 - Tabs and split panes (nested, resizable with the mouse); double-click a tab
   to rename it, drag it to reorder
 - Zoom a pane to fill the whole tab and back (`Ctrl+Shift+Z`)
@@ -41,7 +42,7 @@ Or build it yourself — see [Building](#building).
 - Asks before closing a tab where a program (vim, ssh, …) is still running
 - Drag & drop a file to type its path into the shell
 - JSON settings file, applied live without a restart
-- ☰ menu: theme, matrix toggle, shade and font size sliders
+- ☰ menu: theme, matrix toggle, shade, font size and game sound sliders
 
 ![The night theme with the ☰ menu open](docs/night.png)
 
@@ -112,6 +113,7 @@ key: a letter, a digit, `f1`…`f12`, `left`/`right`/`up`/`down`,
   "scrollback": 10000,
   "confirmClose": true,
   "restoreSession": true,
+  "gameVolume": 0.6,
   "keybindings": {},
   "themes": {}
 }
@@ -127,6 +129,7 @@ key: a letter, a digit, `f1`…`f12`, `left`/`right`/`up`/`down`,
 | `scrollback` | Number of history lines kept per pane |
 | `confirmClose` | Ask before closing a pane, tab or window where a program (vim, ssh, …) is still running |
 | `restoreSession` | Reopen the last run's tabs (directory and name) on start; they're kept in `~/.local/share/uz.otabek.ascy/session.json` |
+| `gameVolume` | Volume of arcade games: `0` (off) … `1` |
 | `keybindings` | Your key bindings, see [Keyboard shortcuts](#keyboard-shortcuts) |
 | `themes` | Your own themes, see below |
 

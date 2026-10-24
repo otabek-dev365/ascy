@@ -1,3 +1,5 @@
+mod audio;
+
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -591,6 +593,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(PtyState::default())
+        .manage(audio::Audio::default())
         .invoke_handler(tauri::generate_handler![
             pty_spawn,
             pty_write,
@@ -611,7 +614,8 @@ pub fn run() {
             game_data_load,
             game_data_save,
             games_open_folder,
-            game_install
+            game_install,
+            audio::arcade_audio
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

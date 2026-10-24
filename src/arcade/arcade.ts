@@ -1,14 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { Terminal } from "@xterm/xterm";
+import { ArcadeAudio } from "./audio";
 import { GridRenderer, isFrame } from "./render";
 import { screenClass, workerMain } from "./worker";
 import hubSource from "./hub.js?raw";
 import snakeSource from "./games/snake/main.js?raw";
 import snakeManifest from "./games/snake/game.json";
 
-/** The game API this Ascy provides ("api" in game.json) */
-const API_VERSION = 1;
+/** The game API this Ascy provides ("api" in game.json); 2 added sound and music */
+const API_VERSION = 2;
+/** Sound effects a game may start per frame */
+const SOUNDS_PER_FRAME = 24;
 const GUIDE_URL = "https://github.com/otabek-dev365/ascy/blob/main/docs/games.md";
 /** A game that sends no frame for this long is stopped */
 const WATCHDOG_MS = 5000;
@@ -90,6 +93,8 @@ export class Arcade {
   private events: Record<string, unknown>[] = [];
   /** A frame was requested and hasn't come back yet */
   private waiting = false;
+  /** The terminal is still taking in the last frame */
+  private drawing = false;
   private sentAt = 0;
   private lastTick = 0;
   private raf = 0;
@@ -105,13 +110,17 @@ export class Arcade {
   /** Bumped by every switch, so a slow load can't start an outdated game */
   private generation = 0;
   private lastMouse = { x: -1, y: -1 };
+  private readonly audio: ArcadeAudio;
+  private sounds = 0;
   private readonly onVisibility = () => this.updateLoop();
 
   constructor(
     private readonly term: Terminal,
     private readonly hooks: ArcadeHooks,
+    volume: number,
   ) {
     this.renderer = new GridRenderer(term);
+    this.audio = new ArcadeAudio(volume);
     // No cursor and no line wrapping: the screen is a grid of cells
     term.write("\x1b[?25l\x1b[?7l");
     document.addEventListener("visibilitychange", this.onVisibility);
@@ -190,6 +199,11 @@ export class Arcade {
     this.updateLoop();
   }
 
+  /** Game sound volume, 0 (off) … 1 */
+  setVolume(volume: number) {
+    this.audio.setVolume(volume);
+  }
+
   key(e: KeyboardEvent) {
     if (e.type !== "keydown" && e.type !== "keyup") return;
     if (this.crashed) {
@@ -238,6 +252,7 @@ export class Arcade {
   dispose() {
     this.flushSave();
     this.stopWorker();
+    this.audio.dispose();
     document.removeEventListener("visibilitychange", this.onVisibility);
   }
 
@@ -276,11 +291,14 @@ export class Arcade {
     if (this.workerUrl) URL.revokeObjectURL(this.workerUrl);
     this.workerUrl = "";
     this.waiting = false;
+    this.drawing = false;
+    this.audio.stop();
     this.updateLoop();
   }
 
   /** The frame loop runs only while a worker is up and the pane is on screen */
   private updateLoop() {
+    this.audio.setHidden(!this.visible || document.hidden);
     const run = !!this.worker && this.visible && !document.hidden;
     if (run && !this.raf) {
       this.lastTick = 0;
@@ -299,8 +317,12 @@ export class Arcade {
       if (now - this.sentAt > WATCHDOG_MS) this.fail("it stopped responding (no frame for 5 seconds)");
       return;
     }
+    // A game that draws a lot must not get ahead of the terminal: frames
+    // would pile up in its write queue and the controls would lag behind
+    if (this.drawing) return;
     const dt = this.lastTick ? Math.min(0.1, (now - this.lastTick) / 1000) : 0;
     this.lastTick = now;
+    this.sounds = 0;
     this.waiting = true;
     this.sentAt = now;
     this.worker.postMessage({ t: "frame", dt, events: this.events.splice(0) });
@@ -316,7 +338,16 @@ export class Arcade {
     switch (m.t) {
       case "frame":
         this.waiting = false;
-        if (isFrame(m, this.term.cols, this.term.rows)) this.renderer.draw(m);
+        if (isFrame(m, this.term.cols, this.term.rows)) {
+          this.drawing = true;
+          this.renderer.draw(m, () => (this.drawing = false));
+        }
+        break;
+      case "sound":
+        if (++this.sounds <= SOUNDS_PER_FRAME) this.audio.play(m.sound, m.opts);
+        break;
+      case "music":
+        this.audio.music(m.song);
         break;
       case "save":
         if (this.current && m.data && typeof m.data === "object") {

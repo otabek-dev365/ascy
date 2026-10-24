@@ -216,7 +216,7 @@ export function workerMain(Screen: any) {
   };
 
   const ascy: Record<string, unknown> = {
-    api: 1,
+    api: 2,
     best: null,
     system: null,
     game(callbacks: Record<string, any>) {
@@ -234,6 +234,14 @@ export function workerMain(Screen: any) {
     },
     exit() {
       post({ t: "exit" });
+    },
+    /** A sound effect, played by Ascy (a worker has no audio) */
+    sound(sound: unknown, opts?: unknown) {
+      post({ t: "sound", sound, opts });
+    },
+    /** Starts a song, or stops the music with null */
+    music(song: unknown) {
+      post({ t: "music", song: song ?? null });
     },
   };
   (self as any).ascy = ascy;

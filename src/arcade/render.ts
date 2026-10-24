@@ -81,7 +81,8 @@ export class GridRenderer {
     this.prev = null;
   }
 
-  draw(f: Frame) {
+  /** `done` runs once the terminal has taken the frame in */
+  draw(f: Frame, done?: () => void) {
     const { width: w, height: h } = f;
     const prev = this.prev?.width === w && this.prev.height === h ? this.prev : null;
     let out = "\x1b[?2026h";
@@ -118,7 +119,7 @@ export class GridRenderer {
       }
     }
     out += "\x1b[0m\x1b[?2026l";
-    this.term.write(out);
+    this.term.write(out, done);
     this.prev = f;
   }
 }

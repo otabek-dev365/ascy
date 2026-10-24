@@ -117,6 +117,7 @@ function start(g) {
   g.won = false;
   placeFood(g);
   g.mode = "play";
+  ascy.sound("select");
 }
 
 function turn(g, dir) {
@@ -143,6 +144,7 @@ function step(g) {
   }
   g.score++;
   g.speed = Math.min(16, g.speed + 0.35);
+  ascy.sound("pickup", { rate: 1 + Math.min(g.score, 30) * 0.02 }); // a little higher with every bite
   if (!placeFood(g)) gameOver(g, true);
 }
 
@@ -159,6 +161,7 @@ function placeFood(g) {
 
 function gameOver(g, won) {
   g.mode = "over";
+  ascy.sound(won ? "powerup" : "hurt");
   g.won = won;
   g.newBest = g.score > 0 && (ascy.best === null || g.score > ascy.best);
   ascy.score(g.score);
